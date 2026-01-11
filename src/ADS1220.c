@@ -9,27 +9,26 @@
  * SysTick精确延时实现 (推荐)
  * ==================================================================== */
 
-static volatile uint32_t g_systick_us = 0;  // 微秒计数器
 static volatile uint32_t g_systick_ms = 0;  // 毫秒计数器
 
 /**
  * @brief  初始化SysTick定时器
  * @param  无
  * @retval 无
- * @note   配置SysTick为1us中断一次 (72MHz系统时钟)
+ * @note   配置SysTick为1ms中断一次 (72MHz系统时钟)
  */
 void SysTick_Init(void)
 {
-    // 配置SysTick:  72MHz / 72 = 1MHz = 1us
-    // SysTick重装载值 = 72 - 1 = 71
-    if (SysTick_Config(SystemCoreClock / 1000000))
+    // 配置SysTick:  72MHz / 1000 = 72kHz = 1ms
+    // SysTick重装载值 = 72000 - 1 = 71999
+    if (SysTick_Config(SystemCoreClock / 1000))
     {
         // 配置失败
         while(1);
     }
     
-    // 设置SysTick中断优先级
-    NVIC_SetPriority(SysTick_IRQn, 0x00);
+    // 设置SysTick中断优先级 (设置为较低优先级，避免影响其他中断)
+    NVIC_SetPriority(SysTick_IRQn, 0x0F);
 }
 
 /**
@@ -39,22 +38,18 @@ void SysTick_Init(void)
  */
 void SysTick_Handler(void)
 {
-    g_systick_us++;
-    
-    if (g_systick_us % 1000 == 0)
-    {
-        g_systick_ms++;
-    }
+    g_systick_ms++;
 }
 
 /**
  * @brief  获取系统运行微秒数
  * @param  无
  * @retval 微秒数
+ * @note   基于毫秒计数器估算，精度为1ms
  */
 uint32_t GetMicros(void)
 {
-    return g_systick_us;
+    return g_systick_ms * 1000;
 }
 
 /**
@@ -71,14 +66,20 @@ uint32_t GetMillis(void)
  * @brief  微秒级精确延时
  * @param  us:  延时微秒数
  * @retval 无
+ * @note   由于SysTick为1ms中断，微秒延时使用忙等待循环实现
+ *         对于1ms以上的延时，建议使用Delay_ms()
  */
 void Delay_us(uint32_t us)
 {
-    uint32_t start = g_systick_us;
+    uint32_t ticks;
     
-    while((g_systick_us - start) < us)
+    // 72MHz系统时钟，每次循环约9个时钟周期
+    // 实际循环次数需要根据编译器优化调整
+    ticks = us * (SystemCoreClock / 1000000) / 9;
+    
+    while(ticks--)
     {
-        // 等待
+        __NOP();
     }
 }
 
