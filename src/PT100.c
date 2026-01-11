@@ -117,23 +117,34 @@ void PT100_Init(PT100_Config_t *config)
 }
 
 /**
- * @brief  读取PT100电阻值
- * @param  config: PT100配置结构体指针
- * @retval 电阻值 (Ω)，错误返回-1.0f
+ * @brief  读取ADC原始数据
+ * @param  无
+ * @retval ADC原始值，错误返回0x7FFFFFFF
  */
-float PT100_ReadResistance(PT100_Config_t *config)
+static int32_t PT100_ReadADCRaw(void)
 {
-    float voltage;
-    float resistance;
-    float idac_current_uA;
-    
     // 启动转换
     ADS1220_StartSync();
     
     // 等待数据就绪 (20SPS需要约50ms)
     if (!ADS1220_WaitForData(1000)) {
-        return -1.0f; // 超时错误
+        return 0x7FFFFFFF; // 超时错误
     }
+    
+    // 读取ADC原始值
+    return ADS1220_ReadData();
+}
+
+/**
+ * @brief  读取PT100电阻值 (绝对测量法)
+ * @param  config: PT100配置结构体指针
+ * @retval 电阻值 (Ω)，错误返回-1.0f
+ */
+static float PT100_ReadResistance_Absolute(PT100_Config_t *config)
+{
+    float voltage;
+    float resistance;
+    float idac_current_uA;
     
     // 读取ADC值并转换为电压
     voltage = ADS1220_ReadVoltage(config->gain, config->vref);
@@ -151,6 +162,56 @@ float PT100_ReadResistance(PT100_Config_t *config)
     resistance = (voltage / idac_current_uA) * 1000000.0f;
     
     return resistance;
+}
+
+/**
+ * @brief  读取PT100电阻值 (比例测量法)
+ * @param  config: PT100配置结构体指针
+ * @retval 电阻值 (Ω)，错误返回-1.0f
+ * @note   消除IDAC电流源误差，提高测量精度
+ */
+static float PT100_ReadResistance_Ratiometric(PT100_Config_t *config)
+{
+    int32_t adc_ref, adc_pt100;
+    float resistance;
+    
+    // 1. 测量参考电阻
+    ADS1220_SetInputMux(config->ref_channel);
+    Delay_ms(10); // 等待配置稳定
+    
+    adc_ref = PT100_ReadADCRaw();
+    if (adc_ref == 0x7FFFFFFF || adc_ref == 0) {
+        return -1.0f; // 读取参考电阻失败
+    }
+    
+    // 2. 测量PT100
+    ADS1220_SetInputMux(config->input_p);
+    Delay_ms(10); // 等待配置稳定
+    
+    adc_pt100 = PT100_ReadADCRaw();
+    if (adc_pt100 == 0x7FFFFFFF) {
+        return -1.0f; // 读取PT100失败
+    }
+    
+    // 3. 计算PT100实际电阻 (比例法消除IDAC误差)
+    // R_PT100 = R_ref × (ADC_PT100 / ADC_ref)
+    resistance = config->ref_resistor * ((float)adc_pt100 / (float)adc_ref);
+    
+    return resistance;
+}
+
+/**
+ * @brief  读取PT100电阻值
+ * @param  config: PT100配置结构体指针
+ * @retval 电阻值 (Ω)，错误返回-1.0f
+ */
+float PT100_ReadResistance(PT100_Config_t *config)
+{
+    if (config->use_ratiometric) {
+        return PT100_ReadResistance_Ratiometric(config);
+    } else {
+        return PT100_ReadResistance_Absolute(config);
+    }
 }
 
 /**

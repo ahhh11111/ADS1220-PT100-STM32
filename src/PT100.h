@@ -27,6 +27,10 @@ typedef struct {
     float vref;                     // 参考电压 (V)
     uint8_t input_p;                // 正输入通道
     uint8_t input_n;                // 负输入通道
+    // 比例测量法配置
+    bool use_ratiometric;           // 是否使用比例测量法
+    float ref_resistor;             // 参考电阻阻值 (Ω)，用于比例测量法
+    uint8_t ref_channel;            // 参考电阻测量通道
 } PT100_Config_t;
 
 /* ====================================================================
