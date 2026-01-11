@@ -116,7 +116,7 @@ void PT100_MeasureExample_2Wire(void)
         {
             temperature = PT100_ResistanceToTemperature(resistance, PT100_TYPE);
             
-            printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %. 2f°C\r\n", 
+            printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %.2f°C\r\n", 
                    ++count, GetMillis()/1000, resistance, temperature);
         }
         else
@@ -166,7 +166,7 @@ void PT100_MeasureExample_Ratiometric(void)
         {
             temperature = PT100_ResistanceToTemperature(resistance, PT100_TYPE);
             
-            printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %. 2f°C\r\n", 
+            printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %.2f°C\r\n", 
                    ++count, GetMillis()/1000, resistance, temperature);
         }
         else
@@ -215,7 +215,7 @@ void PT100_MeasureExample_3Wire(void)
         {
             temperature = PT100_ResistanceToTemperature(resistance, PT100_TYPE);
             
-            printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %. 2f°C\r\n", 
+            printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %.2f°C\r\n", 
                    ++count, GetMillis()/1000, resistance, temperature);
         }
         else
