@@ -19,6 +19,13 @@ typedef enum {
     PT1000_TYPE = 1     // PT1000: 0°C时1000Ω
 } PT100_Type_t;
 
+// PT100接线模式
+typedef enum {
+    PT100_2WIRE = 0,    // 2线制 (仅IDAC1)
+    PT100_3WIRE = 1,    // 3线制 (IDAC1 + IDAC2)
+    PT100_4WIRE = 2     // 4线制 (IDAC1，无需IDAC2)
+} PT100_WireMode_t;
+
 // PT100配置结构体
 typedef struct {
     PT100_Type_t type;              // PT100或PT1000
@@ -31,6 +38,9 @@ typedef struct {
     bool use_ratiometric;           // 是否使用比例测量法
     float ref_resistor;             // 参考电阻阻值 (Ω)，用于比例测量法
     uint8_t ref_channel;            // 参考电阻测量通道
+    // 3线制配置
+    PT100_WireMode_t wire_mode;     // 接线模式
+    uint8_t idac2_pin;              // IDAC2输出引脚 (用于3线制)
 } PT100_Config_t;
 
 /* ====================================================================

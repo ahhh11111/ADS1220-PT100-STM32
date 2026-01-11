@@ -40,6 +40,11 @@ static float PT100_GetIDACCurrent(uint8_t idac_setting)
  * @brief  初始化PT100测量
  * @param  config: PT100配置结构体指针
  * @retval 无
+ * @note   3线制接线说明:
+ *         - PT100一端连接IDAC1输出引脚
+ *         - PT100另一端通过导线连接到差分输入负端
+ *         - IDAC2输出到导线补偿引脚，消除导线电阻影响
+ *         例如: IDAC1->AIN0 (PT100+), AIN1 (PT100-), IDAC2->AIN2 (导线补偿)
  */
 void PT100_Init(PT100_Config_t *config)
 {
@@ -78,9 +83,11 @@ void PT100_Init(PT100_Config_t *config)
         ads_config.reg2 = ADS1220_VREF_EXT_REF0 | ADS1220_FIR_50HZ_60HZ | config->idac;
     }
     
-    // 配置 Register 3: IDAC1路由
+    // 配置 Register 3: IDAC1路由 + IDAC2路由(3线制)
     // 根据输入通道配置IDAC输出
     uint8_t idac1_routing;
+    uint8_t idac2_routing = ADS1220_I2MUX_DISABLED; // 默认禁用IDAC2
+    
     switch(config->input_p & 0xF0) {
         case ADS1220_MUX_AIN0_AIN1: 
         case ADS1220_MUX_AIN0_AIN2: 
@@ -107,7 +114,12 @@ void PT100_Init(PT100_Config_t *config)
             break;
     }
     
-    ads_config.reg3 = idac1_routing | ADS1220_I2MUX_DISABLED;
+    // 3线制配置: 启用IDAC2
+    if (config->wire_mode == PT100_3WIRE) {
+        idac2_routing = config->idac2_pin;
+    }
+    
+    ads_config.reg3 = idac1_routing | idac2_routing;
     
     // 写入配置
     ADS1220_WriteConfig(&ads_config);
