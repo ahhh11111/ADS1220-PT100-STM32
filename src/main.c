@@ -82,30 +82,33 @@ void DelayTest(void)
 }
 
 /**
- * @brief  PT100测量示例
+ * @brief  PT100测量示例 (2线制 - 绝对测量法)
  */
-void PT100_MeasureExample(void)
+void PT100_MeasureExample_2Wire(void)
 {
     PT100_Config_t pt100_config;
     float temperature, resistance;
     uint32_t count = 0;
     
     printf("\r\n========================================\r\n");
-    printf("  PT100温度测量 (增益8倍，250μA)\r\n");
+    printf("  PT100温度测量 (2线制 - 绝对测量法)\r\n");
+    printf("  增益8倍，250μA激励电流\r\n");
     printf("========================================\r\n");
     
-    // 配置PT100参数
+    // 配置PT100参数 (2线制)
     pt100_config.type = PT100_TYPE;
     pt100_config.idac = PT100_IDAC_250UA;
     pt100_config. gain = 8;
     pt100_config.vref = 2.048f;
     pt100_config.input_p = ADS1220_MUX_AIN0_AIN1;
+    pt100_config.use_ratiometric = false;  // 使用绝对测量法
+    pt100_config.wire_mode = PT100_2WIRE;  // 2线制
     
     PT100_Init(&pt100_config);
     
     printf("配置完成，开始测量...\r\n\r\n");
     
-    while(1)
+    for (int i = 0; i < 5; i++)  // 测量5次后退出
     {
         resistance = PT100_ReadResistance(&pt100_config);
         
@@ -113,17 +116,111 @@ void PT100_MeasureExample(void)
         {
             temperature = PT100_ResistanceToTemperature(resistance, PT100_TYPE);
             
-#if defined(ADS1220_DELAY_SYSTICK)
             printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %. 2f°C\r\n", 
                    ++count, GetMillis()/1000, resistance, temperature);
-#else
-            printf("[%lu] 电阻: %.3fΩ, 温度: %. 2f°C\r\n", 
-                   ++count, resistance, temperature);
-#endif
         }
         else
         {
-            printf("[%lu] 读取错误!\r\n", ++count);
+            printf("[%lu] 读取错误! (错误码: %d)\r\n", ++count, ADS1220_GetLastError());
+        }
+        
+        Delay_ms(1000);
+    }
+}
+
+/**
+ * @brief  PT100测量示例 (比例测量法)
+ */
+void PT100_MeasureExample_Ratiometric(void)
+{
+    PT100_Config_t pt100_config;
+    float temperature, resistance;
+    uint32_t count = 0;
+    
+    printf("\r\n========================================\r\n");
+    printf("  PT100温度测量 (比例测量法)\r\n");
+    printf("  参考电阻: 4020Ω (4.02kΩ)\r\n");
+    printf("========================================\r\n");
+    
+    // 配置PT100参数 (比例测量法)
+    pt100_config.type = PT100_TYPE;
+    pt100_config.idac = PT100_IDAC_250UA;
+    pt100_config. gain = 8;
+    pt100_config.vref = 2.048f;
+    pt100_config.input_p = ADS1220_MUX_AIN0_AIN1;    // PT100测量通道
+    pt100_config.use_ratiometric = true;             // 使用比例测量法
+    pt100_config.ref_resistor = 4020.0f;             // 参考电阻 4.02kΩ ±0.1%
+    pt100_config.ref_channel = ADS1220_MUX_AIN2_AIN3; // 参考电阻通道
+    pt100_config.wire_mode = PT100_2WIRE;            // 2线制
+    
+    PT100_Init(&pt100_config);
+    
+    printf("配置完成，开始测量...\r\n");
+    printf("提示: 比例测量法可消除IDAC误差，提高精度\r\n\r\n");
+    
+    for (int i = 0; i < 5; i++)  // 测量5次后退出
+    {
+        resistance = PT100_ReadResistance(&pt100_config);
+        
+        if (resistance > 0)
+        {
+            temperature = PT100_ResistanceToTemperature(resistance, PT100_TYPE);
+            
+            printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %. 2f°C\r\n", 
+                   ++count, GetMillis()/1000, resistance, temperature);
+        }
+        else
+        {
+            printf("[%lu] 读取错误! (错误码: %d)\r\n", ++count, ADS1220_GetLastError());
+        }
+        
+        Delay_ms(1000);
+    }
+}
+
+/**
+ * @brief  PT100测量示例 (3线制)
+ */
+void PT100_MeasureExample_3Wire(void)
+{
+    PT100_Config_t pt100_config;
+    float temperature, resistance;
+    uint32_t count = 0;
+    
+    printf("\r\n========================================\r\n");
+    printf("  PT100温度测量 (3线制)\r\n");
+    printf("  IDAC1->AIN0, IDAC2->AIN2 (导线补偿)\r\n");
+    printf("========================================\r\n");
+    
+    // 配置PT100参数 (3线制)
+    pt100_config.type = PT100_TYPE;
+    pt100_config.idac = PT100_IDAC_250UA;
+    pt100_config. gain = 8;
+    pt100_config.vref = 2.048f;
+    pt100_config.input_p = ADS1220_MUX_AIN0_AIN1;    // PT100测量通道
+    pt100_config.use_ratiometric = false;            // 绝对测量法
+    pt100_config.wire_mode = PT100_3WIRE;            // 3线制
+    pt100_config.idac2_pin = ADS1220_I2MUX_AIN2;     // IDAC2输出到AIN2
+    
+    PT100_Init(&pt100_config);
+    
+    printf("配置完成，开始测量...\r\n");
+    printf("提示: 3线制可消除导线电阻影响\r\n\r\n");
+    
+    for (int i = 0; i < 5; i++)  // 测量5次后退出
+    {
+        resistance = PT100_ReadResistance(&pt100_config);
+        
+        if (resistance > 0)
+        {
+            temperature = PT100_ResistanceToTemperature(resistance, PT100_TYPE);
+            
+            printf("[%lu] [运行:%lus] 电阻: %.3fΩ, 温度: %. 2f°C\r\n", 
+                   ++count, GetMillis()/1000, resistance, temperature);
+        }
+        else
+        {
+            printf("[%lu] 读取错误! (错误码: %d)\r\n", ++count, ADS1220_GetLastError());
         }
         
         Delay_ms(1000);
@@ -144,7 +241,8 @@ int main(void)
     printf("\r\n\r\n");
     printf("========================================\r\n");
     printf("  ADS1220 + PT100 温度测量系统\r\n");
-    printf("  STM32F103C8T6\r\n");
+    printf("  STM32F103C8T6 @ 72MHz\r\n");
+    printf("  固件版本: v1.1 (已修复4个技术问题)\r\n");
     printf("========================================\r\n");
     
     // 初始化ADS1220 (内部会初始化SysTick)
@@ -158,8 +256,22 @@ int main(void)
     
     Delay_ms(1000);
     
-    // PT100测量
-    PT100_MeasureExample();
+    // PT100测量示例 - 2线制 (绝对测量法)
+    PT100_MeasureExample_2Wire();
     
-    while(1);
+    Delay_ms(2000);
+    
+    // PT100测量示例 - 比例测量法
+    PT100_MeasureExample_Ratiometric();
+    
+    Delay_ms(2000);
+    
+    // PT100测量示例 - 3线制
+    PT100_MeasureExample_3Wire();
+    
+    printf("\r\n所有测试完成!\r\n");
+    
+    while(1) {
+        Delay_ms(1000);
+    }
 }
