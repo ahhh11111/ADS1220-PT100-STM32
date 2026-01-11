@@ -230,6 +230,10 @@ static float PT100_ReadResistance_Ratiometric(PT100_Config_t *config)
 {
     int32_t adc_ref, adc_pt100;
     float resistance;
+
+    if (config->ref_resistor <= 0.0f) {
+        return -1.0f;
+    }
     
     // 1. 测量参考电阻
     ADS1220_SetInputMux(config->ref_channel);

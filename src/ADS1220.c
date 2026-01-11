@@ -71,10 +71,14 @@ uint32_t GetMillis(void)
  */
 void Delay_us(uint32_t us)
 {
-    uint32_t ticks = us * (SystemCoreClock / 1000000);
+    if (us == 0U) {
+        return;
+    }
+
+    uint64_t ticks = (uint64_t)us * (uint64_t)(SystemCoreClock / 1000000);
     uint32_t load = SysTick->LOAD + 1U;
     uint32_t start = SysTick->VAL;
-    uint32_t elapsed = 0;
+    uint64_t elapsed = 0;
 
     while (elapsed < ticks) {
         uint32_t current = SysTick->VAL;
