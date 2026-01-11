@@ -171,7 +171,14 @@ int32_t PT100_ResistanceToTemperature_Int(int32_t resistance_mohm, PT100_Type_t 
  */
 void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, int32_t *offset_centideg);
 
-/* 兼容性宏定义 - 将旧API映射到新API */
+/**
+ * @brief 兼容性宏定义 - 将旧API名称映射到新的整数API
+ * @warning 启用整数模式时，这些宏会改变API的返回类型！
+ *          - PT100_ReadResistance 返回 int32_t (mΩ) 而非 float (Ω)
+ *          - PT100_ReadTemperature 返回 int32_t (0.01°C) 而非 float (°C)
+ *          - PT100_ResistanceToTemperature 参数和返回值均为 int32_t
+ *          如需保留原有浮点API，请注释掉 PT100_USE_INTEGER_MATH 宏
+ */
 #define PT100_ReadResistance(cfg)       PT100_ReadResistance_Int(cfg)
 #define PT100_ReadTemperature(cfg)      PT100_ReadTemperature_Int(cfg)
 #define PT100_ResistanceToTemperature(r, t)  PT100_ResistanceToTemperature_Int(r, t)

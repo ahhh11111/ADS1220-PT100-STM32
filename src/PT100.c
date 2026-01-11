@@ -113,6 +113,10 @@ static const int32_t PT100_R_TABLE[] = {
 #define PT100_TABLE_T_MAX   (50000)  /**< 最大温度 (0.01°C) = 500°C */
 #define PT100_TABLE_T_STEP  (1000)   /**< 温度步进 (0.01°C) = 10°C */
 
+/* 线性外推使用的温度系数 (mΩ/°C) */
+#define PT100_DRDT_AT_MINUS50 396    /**< -50°C处的dR/dT ≈ 0.396 Ω/°C = 396 mΩ/°C */
+#define PT100_DRDT_AT_PLUS500 333    /**< 500°C处的dR/dT ≈ 0.333 Ω/°C = 333 mΩ/°C */
+
 #endif /* PT100_USE_INTEGER_MATH */
 
 /* ====================================================================
@@ -293,18 +297,16 @@ int32_t PT100_ResistanceToTemperature_Int(int32_t resistance_mohm, PT100_Type_t 
     if (r_mohm <= PT100_R_TABLE[0])
     {
         /* 低于最小值，使用线性外推 */
-        /* 在-50°C附近，dR/dT ≈ 0.396 Ω/°C = 396 mΩ/°C */
-        /* dT = (R - R_min) / 396, 单位0.01°C */
+        /* dT = (R - R_min) / dR_dT, 单位0.01°C */
         int32_t delta_r = r_mohm - PT100_R_TABLE[0];
-        return PT100_TABLE_T_MIN + (delta_r * 100) / 396;
+        return PT100_TABLE_T_MIN + (delta_r * 100) / PT100_DRDT_AT_MINUS50;
     }
     
     if (r_mohm >= PT100_R_TABLE[PT100_TABLE_SIZE - 1])
     {
         /* 高于最大值，使用线性外推 */
-        /* 在500°C附近，dR/dT ≈ 0.333 Ω/°C = 333 mΩ/°C */
         int32_t delta_r = r_mohm - PT100_R_TABLE[PT100_TABLE_SIZE - 1];
-        return PT100_TABLE_T_MAX + (delta_r * 100) / 333;
+        return PT100_TABLE_T_MAX + (delta_r * 100) / PT100_DRDT_AT_PLUS500;
     }
     
     /* 二分查找找到电阻值所在的区间 */
