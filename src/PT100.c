@@ -5,7 +5,7 @@
  * PT100 常数定义
  * ==================================================================== */
 // PT100 标准参数 (IEC 60751)
-#define PT100_R0            100. 0f      // 0°C时的电阻值 (Ω)
+#define PT100_R0            100.0f      // 0°C时的电阻值 (Ω)
 #define PT100_ALPHA         0.00385f    // 温度系数 (Ω/Ω/°C)
 
 // PT1000 标准参数
@@ -33,6 +33,56 @@ static float PT100_GetIDACCurrent(uint8_t idac_setting)
         case 0x06: return 1000.0f;   // 1000μA
         case 0x07: return 1500.0f;   // 1500μA
         default:    return 0.0f;
+    }
+}
+
+static uint8_t PT100_GetIDAC1Routing(uint8_t mux_setting)
+{
+    switch(mux_setting & 0xF0)
+    {
+        case ADS1220_MUX_AIN0_AIN1:
+        case ADS1220_MUX_AIN0_AIN2:
+        case ADS1220_MUX_AIN0_AIN3:
+        case ADS1220_MUX_AIN0_AVSS:
+            return ADS1220_I1MUX_AIN0;
+        case ADS1220_MUX_AIN1_AIN0:
+        case ADS1220_MUX_AIN1_AIN2:
+        case ADS1220_MUX_AIN1_AIN3:
+        case ADS1220_MUX_AIN1_AVSS:
+            return ADS1220_I1MUX_AIN1;
+        case ADS1220_MUX_AIN2_AIN3:
+        case ADS1220_MUX_AIN2_AVSS:
+            return ADS1220_I1MUX_AIN2;
+        case ADS1220_MUX_AIN3_AIN2:
+        case ADS1220_MUX_AIN3_AVSS:
+            return ADS1220_I1MUX_AIN3;
+        default:
+            return ADS1220_I1MUX_AIN0;
+    }
+}
+
+static uint8_t PT100_GetIDAC2Routing(uint8_t mux_setting)
+{
+    switch(mux_setting & 0xF0)
+    {
+        case ADS1220_MUX_AIN0_AIN1:
+        case ADS1220_MUX_AIN0_AIN2:
+        case ADS1220_MUX_AIN0_AIN3:
+        case ADS1220_MUX_AIN0_AVSS:
+            return ADS1220_I2MUX_AIN0;
+        case ADS1220_MUX_AIN1_AIN0:
+        case ADS1220_MUX_AIN1_AIN2:
+        case ADS1220_MUX_AIN1_AIN3:
+        case ADS1220_MUX_AIN1_AVSS:
+            return ADS1220_I2MUX_AIN1;
+        case ADS1220_MUX_AIN2_AIN3:
+        case ADS1220_MUX_AIN2_AVSS:
+            return ADS1220_I2MUX_AIN2;
+        case ADS1220_MUX_AIN3_AIN2:
+        case ADS1220_MUX_AIN3_AVSS:
+            return ADS1220_I2MUX_AIN3;
+        default:
+            return ADS1220_I2MUX_AIN0;
     }
 }
 
@@ -87,36 +137,14 @@ void PT100_Init(PT100_Config_t *config)
     // 根据输入通道配置IDAC输出
     uint8_t idac1_routing;
     uint8_t idac2_routing = ADS1220_I2MUX_DISABLED; // 默认禁用IDAC2
-    
-    switch(config->input_p & 0xF0) {
-        case ADS1220_MUX_AIN0_AIN1: 
-        case ADS1220_MUX_AIN0_AIN2: 
-        case ADS1220_MUX_AIN0_AIN3:
-        case ADS1220_MUX_AIN0_AVSS:
-            idac1_routing = ADS1220_I1MUX_AIN0; 
-            break;
-        case ADS1220_MUX_AIN1_AIN0:
-        case ADS1220_MUX_AIN1_AIN2:
-        case ADS1220_MUX_AIN1_AIN3:
-        case ADS1220_MUX_AIN1_AVSS:
-            idac1_routing = ADS1220_I1MUX_AIN1; 
-            break;
-        case ADS1220_MUX_AIN2_AIN3:
-        case ADS1220_MUX_AIN2_AVSS:
-            idac1_routing = ADS1220_I1MUX_AIN2; 
-            break;
-        case ADS1220_MUX_AIN3_AIN2:
-        case ADS1220_MUX_AIN3_AVSS:
-            idac1_routing = ADS1220_I1MUX_AIN3; 
-            break;
-        default:  
-            idac1_routing = ADS1220_I1MUX_AIN0; 
-            break;
-    }
+
+    idac1_routing = PT100_GetIDAC1Routing(config->input_p);
     
     // 3线制配置: 启用IDAC2
     if (config->wire_mode == PT100_3WIRE) {
         idac2_routing = config->idac2_pin;
+    } else if (config->use_ratiometric) {
+        idac2_routing = PT100_GetIDAC2Routing(config->ref_channel);
     }
     
     ads_config.reg3 = idac1_routing | idac2_routing;
@@ -164,12 +192,18 @@ static int32_t PT100_ReadADCRaw(void)
  */
 static float PT100_ReadResistance_Absolute(PT100_Config_t *config)
 {
+    int32_t raw_data;
     float voltage;
     float resistance;
     float idac_current_uA;
     
+    raw_data = PT100_ReadADCRaw();
+    if (raw_data == 0x7FFFFFFF) {
+        return -1.0f;
+    }
+
     // 读取ADC值并转换为电压
-    voltage = ADS1220_ReadVoltage(config->gain, config->vref);
+    voltage = ((float)raw_data / 8388608.0f) * (config->vref / (float)config->gain);
     
     // 获取IDAC电流值
     idac_current_uA = PT100_GetIDACCurrent(config->idac);
@@ -196,6 +230,10 @@ static float PT100_ReadResistance_Ratiometric(PT100_Config_t *config)
 {
     int32_t adc_ref, adc_pt100;
     float resistance;
+
+    if (config->ref_resistor <= 0.0f) {
+        return -1.0f;
+    }
     
     // 1. 测量参考电阻
     ADS1220_SetInputMux(config->ref_channel);
