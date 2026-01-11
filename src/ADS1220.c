@@ -152,6 +152,11 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data);
 static void ADS1220_CS_Low(void);
 static void ADS1220_CS_High(void);
 
+/* ====================================================================
+ * 全局错误状态
+ * ==================================================================== */
+static int g_last_error = ADS1220_ERROR_NONE;
+
 #ifdef ADS1220_USE_SOFTWARE_SPI
 static void ADS1220_SCK_Low(void);
 static void ADS1220_SCK_High(void);
@@ -239,7 +244,7 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
 /**
  * @brief  硬件SPI传输一个字节
  * @param  data: 要发送的数据
- * @retval 接收到的数据
+ * @retval 接收到的数据，超时返回0并设置错误标志
  */
 static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
 {
@@ -248,8 +253,10 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
     // 等待发送缓冲区空
     while (SPI_I2S_GetFlagStatus(ADS1220_SPI, SPI_I2S_FLAG_TXE) == RESET)
     {
-        if (++retry > 5000)
+        if (++retry > 5000) {
+            g_last_error = ADS1220_ERROR_TIMEOUT;
             return 0;
+        }
     }
     
     // 发送数据
@@ -259,8 +266,10 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
     // 等待接收缓冲区非空
     while (SPI_I2S_GetFlagStatus(ADS1220_SPI, SPI_I2S_FLAG_RXNE) == RESET)
     {
-        if (++retry > 5000)
+        if (++retry > 5000) {
+            g_last_error = ADS1220_ERROR_TIMEOUT;
             return 0;
+        }
     }
     
     // 返回接收的数据
@@ -698,4 +707,24 @@ void ADS1220_GetDefaultConfig(ADS1220_Config_t *config)
     config->reg1 = ADS1220_DR_20SPS | ADS1220_MODE_NORMAL | ADS1220_CM_SINGLE;
     config->reg2 = ADS1220_VREF_INT | ADS1220_FIR_NONE;
     config->reg3 = 0x00;
+}
+
+/**
+ * @brief  获取最后一次错误码
+ * @param  无
+ * @retval 错误码
+ */
+int ADS1220_GetLastError(void)
+{
+    return g_last_error;
+}
+
+/**
+ * @brief  清除错误状态
+ * @param  无
+ * @retval 无
+ */
+void ADS1220_ClearError(void)
+{
+    g_last_error = ADS1220_ERROR_NONE;
 }

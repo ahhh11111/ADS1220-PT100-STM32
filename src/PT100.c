@@ -135,6 +135,9 @@ void PT100_Init(PT100_Config_t *config)
  */
 static int32_t PT100_ReadADCRaw(void)
 {
+    // 清除之前的错误
+    ADS1220_ClearError();
+    
     // 启动转换
     ADS1220_StartSync();
     
@@ -144,7 +147,14 @@ static int32_t PT100_ReadADCRaw(void)
     }
     
     // 读取ADC原始值
-    return ADS1220_ReadData();
+    int32_t data = ADS1220_ReadData();
+    
+    // 检查SPI错误
+    if (ADS1220_GetLastError() != ADS1220_ERROR_NONE) {
+        return 0x7FFFFFFF; // SPI错误
+    }
+    
+    return data;
 }
 
 /**
