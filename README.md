@@ -130,8 +130,6 @@ int main(void)
                  └─────────┘
 ```
 
-**详细连接说明**:  见 [docs/hardware-connection.md](docs/hardware-connection.md)
-
 ---
 
 ## ⚙️ 配置选项
@@ -181,8 +179,6 @@ int main(void)
 #define ADS1220_DRDY_PORT       GPIOA
 ```
 
-**完整配置指南**: [docs/configuration-guide.md](docs/configuration-guide.md)
-
 ---
 
 ## 📚 API文档
@@ -225,8 +221,6 @@ float PT100_ReadTemperature(PT100_Config_t *config);
 float PT100_ResistanceToTemperature(float resistance, PT100_Type_t type);
 void PT100_Calibrate(PT100_Config_t *config, float known_temp, float *offset);
 ```
-
-**完整API参考**: [docs/api-reference.md](docs/api-reference.md)
 
 ---
 
