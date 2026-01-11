@@ -32,7 +32,6 @@ void SysTick_Init(void)
             ;
     }
 
-    // 修复: 将SysTick优先级设为最高 (0x00)，防止被其他中断打断导致计时不准
     // 注意: 在STM32中，数值越小优先级越高
     NVIC_SetPriority(SysTick_IRQn, 0x0F);
 }
