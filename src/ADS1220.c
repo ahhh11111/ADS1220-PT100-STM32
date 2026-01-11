@@ -71,15 +71,25 @@ uint32_t GetMillis(void)
  */
 void Delay_us(uint32_t us)
 {
-    uint32_t ticks;
-    
-    // 72MHz系统时钟，每次循环约9个时钟周期
-    // 实际循环次数需要根据编译器优化调整
-    ticks = us * (SystemCoreClock / 1000000) / 9;
-    
-    while(ticks--)
-    {
-        __NOP();
+    if (us == 0U) {
+        return;
+    }
+
+    uint64_t ticks = (uint64_t)us * (uint64_t)(SystemCoreClock / 1000000);
+    uint32_t load = SysTick->LOAD + 1U;
+    uint32_t start = SysTick->VAL;
+    uint64_t elapsed = 0;
+
+    while (elapsed < ticks) {
+        uint32_t current = SysTick->VAL;
+
+        if (current <= start) {
+            elapsed += (start - current);
+        } else {
+            elapsed += (start + load - current);
+        }
+
+        start = current;
     }
 }
 
