@@ -26,7 +26,7 @@
 #ifndef ADS1220_DELAY_SYSTICK
 #ifndef ADS1220_DELAY_SIMPLE
 #ifndef ADS1220_DELAY_EXTERNAL
-    #define ADS1220_DELAY_SYSTICK           /**< 默认使用SysTick定时器延时 */
+#define ADS1220_DELAY_SYSTICK /**< 默认使用SysTick定时器延时 */
 #endif
 #endif
 #endif

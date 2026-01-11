@@ -200,7 +200,7 @@ void ADS1220_GetDefaultConfig(ADS1220_Config_t *config);
 ```c
 int32_t ADS1220_ReadData(void);
 float ADS1220_ReadVoltage(uint8_t gain, float vref);
-bool ADS1220_WaitForData(uint32_t timeout_ms);
+uint8_t ADS1220_WaitForData(uint32_t timeout_ms);
 ```
 
 #### 快速配置

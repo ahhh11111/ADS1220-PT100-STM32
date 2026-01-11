@@ -64,21 +64,22 @@ uint32_t GetMicros(void)
 {
     uint32_t ms, ticks;
     uint32_t load = SysTick->LOAD;
-    
+
     // 读取当前毫秒数和SysTick计数值
     // 注意: 需要处理SysTick中断可能导致的不一致性
-    do {
+    do
+    {
         ms = g_systick_ms;
         ticks = SysTick->VAL;
     } while (ms != g_systick_ms);
-    
+
     // SysTick是向下计数的，计算已经过的ticks
     uint32_t elapsed_ticks = load - ticks;
-    
+
     // 将ticks转换为微秒: ticks * 1000000 / SystemCoreClock
     // 为避免溢出，改为: (ticks * 1000) / (SystemCoreClock / 1000)
     uint32_t us_in_tick = (elapsed_ticks * 1000) / (SystemCoreClock / 1000);
-    
+
     return (ms * 1000) + us_in_tick;
 }
 
@@ -136,7 +137,7 @@ void Delay_us(uint32_t us)
     uint32_t ticks = (SystemCoreClock / 1000000) * us;
     // 每个循环约4个时钟周期 (编译器优化级别会影响这个值)
     ticks = ticks / 4;
-    
+
     while (ticks--)
     {
         __NOP(); // 空操作，防止被编译器优化掉
@@ -204,5 +205,5 @@ __attribute__((weak)) uint32_t GetMillis(void)
 }
 
 #else
-    #error "必须定义一种延时模式: ADS1220_DELAY_SYSTICK, ADS1220_DELAY_SIMPLE, 或 ADS1220_DELAY_EXTERNAL"
+#error "必须定义一种延时模式: ADS1220_DELAY_SYSTICK, ADS1220_DELAY_SIMPLE, 或 ADS1220_DELAY_EXTERNAL"
 #endif

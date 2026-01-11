@@ -18,16 +18,16 @@
 /* ====================================================================
  * 私有函数声明
  * ==================================================================== */
-static void ADS1220_GPIO_Init(void);           /**< GPIO初始化 */
-static void ADS1220_SPI_Init(void);            /**< SPI初始化 */
-static uint8_t ADS1220_SPI_TransferByte(uint8_t data);  /**< SPI字节传输 */
-static void ADS1220_CS_Low(void);              /**< 片选拉低 */
-static void ADS1220_CS_High(void);             /**< 片选拉高 */
+static void ADS1220_GPIO_Init(void);                   /**< GPIO初始化 */
+static void ADS1220_SPI_Init(void);                    /**< SPI初始化 */
+static uint8_t ADS1220_SPI_TransferByte(uint8_t data); /**< SPI字节传输 */
+static void ADS1220_CS_Low(void);                      /**< 片选拉低 */
+static void ADS1220_CS_High(void);                     /**< 片选拉高 */
 
 /* ====================================================================
  * 私有变量
  * ==================================================================== */
-static int g_last_error = ADS1220_ERROR_NONE;  /**< 全局错误状态 */
+static int g_last_error = ADS1220_ERROR_NONE; /**< 全局错误状态 */
 
 /* ====================================================================
  * GPIO控制函数实现
@@ -35,17 +35,17 @@ static int g_last_error = ADS1220_ERROR_NONE;  /**< 全局错误状态 */
 /**
  * @brief  片选信号拉低
  */
-static void ADS1220_CS_Low(void) 
-{ 
-    GPIO_ResetBits(ADS1220_CS_PORT, ADS1220_CS_PIN); 
+static void ADS1220_CS_Low(void)
+{
+    GPIO_ResetBits(ADS1220_CS_PORT, ADS1220_CS_PIN);
 }
 
 /**
  * @brief  片选信号拉高
  */
-static void ADS1220_CS_High(void) 
-{ 
-    GPIO_SetBits(ADS1220_CS_PORT, ADS1220_CS_PIN); 
+static void ADS1220_CS_High(void)
+{
+    GPIO_SetBits(ADS1220_CS_PORT, ADS1220_CS_PIN);
 }
 
 /* ====================================================================
@@ -56,17 +56,17 @@ static void ADS1220_CS_High(void)
 /**
  * @brief  软件SPI - SCK拉低
  */
-static void ADS1220_SCK_Low(void) 
-{ 
-    GPIO_ResetBits(ADS1220_SCK_PORT, ADS1220_SCK_PIN); 
+static void ADS1220_SCK_Low(void)
+{
+    GPIO_ResetBits(ADS1220_SCK_PORT, ADS1220_SCK_PIN);
 }
 
 /**
  * @brief  软件SPI - SCK拉高
  */
-static void ADS1220_SCK_High(void) 
-{ 
-    GPIO_SetBits(ADS1220_SCK_PORT, ADS1220_SCK_PIN); 
+static void ADS1220_SCK_High(void)
+{
+    GPIO_SetBits(ADS1220_SCK_PORT, ADS1220_SCK_PIN);
 }
 
 /**
@@ -95,7 +95,7 @@ static uint8_t ADS1220_MISO_Read(void)
  * @note   SPI Mode 1: CPOL=0 (空闲低电平), CPHA=1 (第二边沿采样)
  * @param  data: 要发送的字节
  * @retval 接收到的字节
- * 
+ *
  * 时序说明:
  *   - SCK空闲状态为低电平
  *   - 数据在SCK上升沿输出
@@ -106,7 +106,7 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
     uint8_t i;
     uint8_t recv = 0;
 
-    ADS1220_SCK_Low();  // 确保起始状态为低电平
+    ADS1220_SCK_Low(); // 确保起始状态为低电平
 
     for (i = 0; i < 8; i++)
     {
@@ -128,11 +128,11 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
         ADS1220_SCK_Low();
         Delay_us(1);
     }
-    
+
     return recv;
 }
 
-#else  /* 使用硬件SPI */
+#else /* 使用硬件SPI */
 
 /* ====================================================================
  * 硬件SPI实现
@@ -174,7 +174,7 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
     return SPI_I2S_ReceiveData(ADS1220_SPI);
 }
 
-#endif  /* ADS1220_USE_SOFTWARE_SPI */
+#endif /* ADS1220_USE_SOFTWARE_SPI */
 
 /* ====================================================================
  * 硬件初始化函数
@@ -196,7 +196,7 @@ static void ADS1220_GPIO_Init(void)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(ADS1220_CS_PORT, &GPIO_InitStructure);
-    ADS1220_CS_High();  // 默认拉高，禁用芯片
+    ADS1220_CS_High(); // 默认拉高，禁用芯片
 
     /* 配置DRDY引脚(上拉输入) */
     GPIO_InitStructure.GPIO_Pin = ADS1220_DRDY_PIN;
@@ -221,7 +221,7 @@ static void ADS1220_GPIO_Init(void)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(ADS1220_MISO_PORT, &GPIO_InitStructure);
 
-    ADS1220_SCK_Low();  // SCK初始状态为低(SPI Mode 1)
+    ADS1220_SCK_Low(); // SCK初始状态为低(SPI Mode 1)
 #else
     /* 硬件SPI引脚配置 */
     RCC_APB2PeriphClockCmd(ADS1220_SPI_GPIO_CLK | RCC_APB2Periph_AFIO, ENABLE);
@@ -278,12 +278,12 @@ static void ADS1220_SPI_Init(void)
 void ADS1220_Init(void)
 {
 #if defined(ADS1220_DELAY_SYSTICK)
-    SysTick_Init();  // 初始化SysTick定时器
+    SysTick_Init(); // 初始化SysTick定时器
 #endif
-    ADS1220_GPIO_Init();  // 初始化GPIO
-    ADS1220_SPI_Init();   // 初始化SPI
-    Delay_ms(10);         // 等待芯片上电稳定
-    ADS1220_Reset();      // 复位芯片
+    ADS1220_GPIO_Init(); // 初始化GPIO
+    ADS1220_SPI_Init();  // 初始化SPI
+    Delay_ms(10);        // 等待芯片上电稳定
+    ADS1220_Reset();     // 复位芯片
 }
 
 /**
@@ -291,9 +291,9 @@ void ADS1220_Init(void)
  */
 void ADS1220_DeInit(void)
 {
-    ADS1220_PowerDown();  // 进入掉电模式
+    ADS1220_PowerDown(); // 进入掉电模式
 #ifndef ADS1220_USE_SOFTWARE_SPI
-    SPI_Cmd(ADS1220_SPI, DISABLE);  // 禁用SPI
+    SPI_Cmd(ADS1220_SPI, DISABLE); // 禁用SPI
 #endif
 }
 
@@ -315,7 +315,7 @@ void ADS1220_SendCommand(uint8_t cmd)
 void ADS1220_Reset(void)
 {
     ADS1220_SendCommand(ADS1220_CMD_RESET);
-    Delay_ms(2);  // 数据手册建议等待至少50us，这里保守等待2ms
+    Delay_ms(2); // 数据手册建议等待至少50us，这里保守等待2ms
 }
 
 /**
@@ -368,7 +368,7 @@ uint8_t ADS1220_ReadRegister(uint8_t reg)
     ADS1220_CS_Low();
     Delay_us(2);
     ADS1220_SPI_TransferByte(cmd);
-    value = ADS1220_SPI_TransferByte(0xFF);  // 发送dummy byte读取数据
+    value = ADS1220_SPI_TransferByte(0xFF); // 发送dummy byte读取数据
     Delay_us(2);
     ADS1220_CS_High();
 
@@ -399,9 +399,9 @@ void ADS1220_ReadConfig(ADS1220_Config_t *config)
 
 /**
  * @brief  检查数据是否就绪
- * @retval true=数据就绪(DRDY为低), false=数据未就绪
+ * @retval 1=数据就绪(DRDY为低), 0=数据未就绪
  */
-bool ADS1220_IsDataReady(void)
+uint8_t ADS1220_IsDataReady(void)
 {
     return (GPIO_ReadInputDataBit(ADS1220_DRDY_PORT, ADS1220_DRDY_PIN) == Bit_RESET);
 }
@@ -409,17 +409,17 @@ bool ADS1220_IsDataReady(void)
 /**
  * @brief  等待数据就绪
  * @param  timeout_ms: 超时时间(毫秒)
- * @retval true=数据就绪, false=超时
+ * @retval 1=数据就绪, 0=超时
  */
-bool ADS1220_WaitForData(uint32_t timeout_ms)
+uint8_t ADS1220_WaitForData(uint32_t timeout_ms)
 {
     uint32_t start_ms = GetMillis();
     while (!ADS1220_IsDataReady())
     {
         if ((GetMillis() - start_ms) > timeout_ms)
-            return false;
+            return 0;
     }
-    return true;
+    return 1;
 }
 
 /**
@@ -437,9 +437,9 @@ int32_t ADS1220_ReadData(void)
 
     /* 发送读数据命令并接收3字节数据 */
     ADS1220_SPI_TransferByte(ADS1220_CMD_RDATA);
-    buf[0] = ADS1220_SPI_TransferByte(0xFF);  // MSB
-    buf[1] = ADS1220_SPI_TransferByte(0xFF);  // 中间字节
-    buf[2] = ADS1220_SPI_TransferByte(0xFF);  // LSB
+    buf[0] = ADS1220_SPI_TransferByte(0xFF); // MSB
+    buf[1] = ADS1220_SPI_TransferByte(0xFF); // 中间字节
+    buf[2] = ADS1220_SPI_TransferByte(0xFF); // LSB
 
     Delay_us(2);
     ADS1220_CS_High();
@@ -570,15 +570,15 @@ void ADS1220_GetDefaultConfig(ADS1220_Config_t *config)
 /**
  * @brief  获取最后一次错误码
  */
-int ADS1220_GetLastError(void) 
-{ 
-    return g_last_error; 
+int ADS1220_GetLastError(void)
+{
+    return g_last_error;
 }
 
 /**
  * @brief  清除错误状态
  */
-void ADS1220_ClearError(void) 
-{ 
-    g_last_error = ADS1220_ERROR_NONE; 
+void ADS1220_ClearError(void)
+{
+    g_last_error = ADS1220_ERROR_NONE;
 }
