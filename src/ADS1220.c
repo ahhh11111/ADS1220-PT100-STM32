@@ -1,20 +1,18 @@
 /**
  * @file    ADS1220.c
- * @brief   ADS1220 24位高精度ADC驱动库 - 实现文件
+ * @brief   ADS1220 24位高精度ADC驱动库 - 实现文件 (已修复SPI时序)
  * @details 实现ADS1220的完整驱动功能，包括:
- *          - SPI通信(硬件/软件可选)
- *          - 寄存器配置
- *          - 数据采集和转换
- *          - 错误处理
- * @version 1.1
- * @date    2024-01-11
+ * - SPI通信(硬件/软件可选)
+ * - 修复软件SPI Mode 1时序问题
+ * - 寄存器配置
+ * - 数据采集和转换
+ * - 错误处理
+ * @version 1.2
+ * @date    2026-01-12
  */
 
 #include "ADS1220.h"
 
-/* ====================================================================
- * 私有函数声明
- * ==================================================================== */
 /* ====================================================================
  * 私有函数声明
  * ==================================================================== */
@@ -91,15 +89,15 @@ static uint8_t ADS1220_MISO_Read(void)
 }
 
 /**
- * @brief  软件SPI字节传输 (SPI Mode 1优化)
+ * @brief  软件SPI字节传输 (SPI Mode 1 严格时序)
  * @note   SPI Mode 1: CPOL=0 (空闲低电平), CPHA=1 (第二边沿采样)
  * @param  data: 要发送的字节
  * @retval 接收到的字节
  *
  * 时序说明:
- *   - SCK空闲状态为低电平
- *   - 数据在SCK上升沿输出
- *   - 数据在SCK下降沿采样
+ * - 初始状态: SCK Low
+ * - 边沿1 (Rising): Host写MOSI (Shift), Slave写MISO (Shift)
+ * - 边沿2 (Falling): Host读MISO (Sample), Slave读MOSI (Sample)
  */
 static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
 {
@@ -110,22 +108,34 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
 
     for (i = 0; i < 8; i++)
     {
-        /* 1. 准备MOSI数据(在SCK上升沿前建立数据) */
+        /* 1. 准备MOSI数据 
+         * 虽然Mode 1是在Rising Edge Shift，但这里在Rising之前准备好数据
+         * 可以保证更充裕的Setup时间，对Slave来说是完全合法的。
+         */
         ADS1220_MOSI_Write(data & 0x80);
         data <<= 1;
         Delay_us(1);
 
-        /* 2. SCK上升沿(从机输出MISO数据) */
+        /* 2. SCK上升沿 (Leading Edge)
+         * Slave在此边沿输出MISO数据
+         */
         ADS1220_SCK_High();
         Delay_us(1);
 
-        /* 3. 主机采样MISO数据 */
+        /* 3. SCK下降沿 (Trailing Edge)
+         * 这是SPI Mode 1的采样时刻
+         * Slave在此边沿采样MOSI
+         */
+        ADS1220_SCK_Low();
+        
+        /* 4. 主机采样MISO数据
+         * 在SCK拉低后立即读取，模拟在下降沿采样
+         * 此时数据在下一个上升沿之前都是有效的
+         */
         recv <<= 1;
         if (ADS1220_MISO_Read())
             recv |= 0x01;
-
-        /* 4. SCK下降沿(从机采样MOSI数据) */
-        ADS1220_SCK_Low();
+            
         Delay_us(1);
     }
 
@@ -474,7 +484,7 @@ float ADS1220_ReadVoltage(uint8_t gain, float vref)
  * @brief  读取内部温度传感器值
  * @retval 温度值(°C)
  * @note   需要先配置TS=1使能温度传感器
- *         分辨率: 0.03125°C/LSB
+ * 分辨率: 0.03125°C/LSB
  */
 int16_t ADS1220_ReadTemperature(void)
 {
@@ -548,12 +558,12 @@ void ADS1220_SetVref(uint8_t vref)
  * @brief  获取默认配置
  * @param  config: 配置结构体指针(输出)
  * @note   默认配置:
- *         - 输入: AIN0-AIN1差分
- *         - 增益: 1
- *         - 采样率: 20 SPS
- *         - 模式: 正常模式，单次转换
- *         - 基准: 内部2.048V
- *         - IDAC: 关闭
+ * - 输入: AIN0-AIN1差分
+ * - 增益: 1
+ * - 采样率: 20 SPS
+ * - 模式: 正常模式，单次转换
+ * - 基准: 内部2.048V
+ * - IDAC: 关闭
  */
 void ADS1220_GetDefaultConfig(ADS1220_Config_t *config)
 {
