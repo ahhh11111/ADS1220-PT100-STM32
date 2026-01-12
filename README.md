@@ -21,15 +21,16 @@
 - ✅ **可编程增益** - 1~128倍增益
 - ✅ **内部温度传感器** - 芯片温度监测
 - ✅ **低噪声滤波** - 50/60Hz陷波滤波器
+- ✅ **硬件比例测量** - ADS1220内置比例测量功能
 
 ### PT100温度测量
 - 🌡️ **PT100/PT1000支持** - 自动识别
-- 🎯 **高精度算法** - Callendar-Van Dusen方程
+- 🎯 **高精度算法** - 查表+线性插值，精度±0.1°C
 - ⚡ **可配置激励电流** - 10μA ~ 1500μA
 - 🔧 **灵活配置** - 增益、采样率、滤波器
 - 📊 **直接温度输出** - 自动电阻-温度转换
-- 🛠️ **校准功能** - 单点/多点校准支持
-- 🔢 **整数运算模式** - 适用于无FPU的MCU（如STM32F103），精度±0.1°C
+- 🛠️ **校准功能** - 单点校准支持
+- 🔢 **纯整数运算** - 适用于无FPU的MCU（如STM32F103）
 
 ---
 
@@ -64,8 +65,6 @@ cd ADS1220-PT100-STM32
 
 ### 3. 基本使用
 
-#### 整数模式（无FPU，推荐用于STM32F103）
-
 ```c
 #include "ADS1220.h"
 #include "PT100.h"
@@ -78,14 +77,13 @@ int main(void)
     // 初始化ADS1220
     ADS1220_Init();
     
-    // 配置PT100测量（整数模式）
+    // 配置PT100测量
     PT100_Config_t pt100_config = {
         .type = PT100_TYPE,
         .idac = PT100_IDAC_250UA,
         .gain = 8,
         .vref_mv = 2048,  // 2048mV = 2.048V
         .input_p = ADS1220_MUX_AIN0_AIN1,
-        .use_ratiometric = 0,
         .wire_mode = PT100_2WIRE
     };
     
@@ -100,42 +98,6 @@ int main(void)
         printf("Temperature: %ld.%02ld °C\n", 
                (long)(temperature / 100), 
                (long)(temperature >= 0 ? temperature % 100 : (-temperature) % 100));
-        
-        Delay_ms(1000);
-    }
-}
-```
-
-#### 浮点模式（有FPU的MCU）
-
-```c
-#include "ADS1220.h"
-#include "PT100.h"
-
-int main(void)
-{
-    // 系统初始化
-    SystemInit();
-    
-    // 初始化ADS1220
-    ADS1220_Init();
-    
-    // 配置PT100测量（浮点模式）
-    PT100_Config_t pt100_config = {
-        .type = PT100_TYPE,
-        .idac = PT100_IDAC_250UA,
-        .gain = 8,
-        .vref = 2.048f,
-        .input_p = ADS1220_MUX_AIN0_AIN1
-    };
-    
-    PT100_Init(&pt100_config);
-    
-    while(1)
-    {
-        // 读取温度
-        float temperature = PT100_ReadTemperature(&pt100_config);
-        printf("Temperature: %.2f °C\n", temperature);
         
         Delay_ms(1000);
     }
@@ -179,28 +141,7 @@ int main(void)
 
 ## ⚙️ 配置选项
 
-### 1. 整数/浮点模式选择（PT100测量）
-
-在 `PT100.h` 中：
-
-```c
-// 使用整数运算模式 (适用于无FPU的MCU如STM32F103，默认开启)
-#define PT100_USE_INTEGER_MATH
-
-// 使用浮点运算模式 (适用于有FPU的MCU)
-// 注释掉上面的宏定义即可切换到浮点模式
-```
-
-| 模式 | 精度 | 适用MCU | 说明 |
-|------|------|---------|------|
-| 整数模式 | ±0.1°C | STM32F103等无FPU的MCU | 使用查表+线性插值，无需浮点运算 |
-| 浮点模式 | 更高精度 | STM32F4等有FPU的MCU | 使用Callendar-Van Dusen方程 |
-
-**整数模式单位说明:**
-- 电阻: mΩ（毫欧姆），例如 100000mΩ = 100Ω
-- 温度: 0.01°C（百分之一摄氏度），例如 2500 = 25.00°C
-
-### 2. SPI模式选择
+### 1. SPI模式选择
 
 在 `ADS1220.h` 中：
 
@@ -212,7 +153,7 @@ int main(void)
 #define ADS1220_USE_SOFTWARE_SPI
 ```
 
-### 3. 延时函数选择
+### 2. 延时函数选择
 
 ```c
 // 选项1: SysTick精确延时 (推荐)
@@ -231,7 +172,7 @@ int main(void)
 | 简单循环 | ±10μs | 无 | 资源受限 |
 | 外部函数 | 自定义 | 自定义 | 已有延时系统 |
 
-### 4. 引脚配置
+### 3. 引脚配置
 
 修改 `ADS1220.h` 中的引脚定义：
 
@@ -265,7 +206,7 @@ void ADS1220_GetDefaultConfig(ADS1220_Config_t *config);
 
 ```c
 int32_t ADS1220_ReadData(void);
-float ADS1220_ReadVoltage(uint8_t gain, float vref);
+int32_t ADS1220_ReadVoltage_Int(uint8_t gain, int32_t vref_unit);
 uint8_t ADS1220_WaitForData(uint32_t timeout_ms);
 ```
 
@@ -280,8 +221,6 @@ void ADS1220_SetConversionMode(uint8_t mode);
 
 ### PT100 测量函数
 
-#### 整数模式（无FPU的MCU）
-
 ```c
 void PT100_Init(PT100_Config_t *config);
 int32_t PT100_ReadResistance_Int(PT100_Config_t *config);   // 返回值单位: mΩ
@@ -290,15 +229,9 @@ int32_t PT100_ResistanceToTemperature_Int(int32_t resistance_mohm, PT100_Type_t 
 void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, int32_t *offset_centideg);
 ```
 
-#### 浮点模式（有FPU的MCU）
-
-```c
-void PT100_Init(PT100_Config_t *config);
-float PT100_ReadResistance(PT100_Config_t *config);
-float PT100_ReadTemperature(PT100_Config_t *config);
-float PT100_ResistanceToTemperature(float resistance, PT100_Type_t type);
-void PT100_Calibrate(PT100_Config_t *config, float known_temp, float *offset);
-```
+**单位说明:**
+- 电阻: mΩ（毫欧姆），例如 100000mΩ = 100Ω
+- 温度: 0.01°C（百分之一摄氏度），例如 2500 = 25.00°C
 
 ---
 
@@ -323,8 +256,9 @@ int main(void)
         ADS1220_StartSync();
         if (ADS1220_WaitForData(1000))
         {
-            float voltage = ADS1220_ReadVoltage(1, 2.048);
-            printf("Voltage: %. 6f V\n", voltage);
+            // 读取电压 (单位: mV)
+            int32_t voltage_mv = ADS1220_ReadVoltage_Int(1, 2048);
+            printf("Voltage: %ld mV\n", (long)voltage_mv);
         }
         Delay_ms(100);
     }
@@ -344,19 +278,23 @@ int main(void)
         .type = PT100_TYPE,
         .idac = PT100_IDAC_250UA,
         .gain = 8,
-        .vref = 2.048f,
-        .input_p = ADS1220_MUX_AIN0_AIN1
+        .vref_mv = 2048,
+        .input_p = ADS1220_MUX_AIN0_AIN1,
+        .wire_mode = PT100_2WIRE
     };
     
     PT100_Init(&pt100);
     
     while(1)
     {
-        float temp = PT100_ReadTemperature(&pt100);
-        float res = PT100_ReadResistance(&pt100);
+        int32_t temp = PT100_ReadTemperature_Int(&pt100);  // 单位: 0.01°C
+        int32_t res = PT100_ReadResistance_Int(&pt100);    // 单位: mΩ
         
-        printf("Temperature: %.2f °C\n", temp);
-        printf("Resistance: %.3f Ω\n", res);
+        printf("Temperature: %ld.%02ld °C\n", 
+               (long)(temp / 100), 
+               (long)(temp >= 0 ? temp % 100 : (-temp) % 100));
+        printf("Resistance: %ld.%03ld Ω\n", 
+               (long)(res / 1000), (long)(res % 1000));
         
         Delay_ms(1000);
     }
@@ -379,8 +317,8 @@ for (int i = 0; i < 4; i++)
     ADS1220_StartSync();
     ADS1220_WaitForData(1000);
     
-    float voltage = ADS1220_ReadVoltage(1, 2.048);
-    printf("CH%d: %.6f V\n", i, voltage);
+    int32_t voltage_mv = ADS1220_ReadVoltage_Int(1, 2048);
+    printf("CH%d: %ld mV\n", i, (long)voltage_mv);
 }
 ```
 
@@ -391,12 +329,10 @@ for (int i = 0; i < 4; i++)
 | 参数 | 值 | 说明 |
 |-----|----|----|
 | ADC分辨率 | 24位 | 有效位数约20位 |
-| 测量范围 | ±2. 048V | 内部基准 |
+| 测量范围 | ±2.048V | 内部基准 |
 | 增益范围 | 1 ~ 128 | 可编程 |
 | 采样率 | 20 ~ 2000 SPS | 可配置 |
-| SPI时钟 | 最高4MHz | 实际使用2. 25MHz |
+| SPI时钟 | 最高4MHz | 实际使用2.25MHz |
+| 温度精度 | ±0.1°C | 使用查表+线性插值 |
 
 ---
-
-
-
