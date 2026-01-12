@@ -473,11 +473,32 @@ int32_t ADS1220_ReadData(void)
  * @retval 电压值(V)
  * @note   转换公式: V = (ADC_Code / 2^23) * (Vref / Gain)
  */
-float ADS1220_ReadVoltage(uint8_t gain, float vref)
+float ADS1220_ReadVoltage_Float(uint8_t gain, float vref)
 {
     int32_t raw_data = ADS1220_ReadData();
     /* 24位ADC满量程为 2^23 = 8388608 */
     return ((float)raw_data / 8388608.0f) * (vref / (float)gain);
+}
+
+/**
+ * @brief  读取电压值（整数版本）
+ * @param  gain: 增益值(1,2,4,8,16,32,64,128)
+ * @param  vref_unit: 基准电压(单位由调用者决定)
+ * @retval 电压值(与vref_unit相同单位)
+ * @note   转换公式: V = (ADC_Code * Vref) / (2^23 * Gain)
+ *         使用整数运算，避免浮点计算
+ *         
+ * 使用示例: 
+ * - 微伏:  ADS1220_ReadVoltage_Int(1, 2048000)  // vref=2.048V, 返回µV
+ * - 毫伏: ADS1220_ReadVoltage_Int(1, 2048)     // vref=2.048V, 返回mV  
+ * - 伏特: ADS1220_ReadVoltage_Int(1, 2)        // vref=2.048V, 返回V(整数部分)
+ */
+int32_t ADS1220_ReadVoltage_Int(uint8_t gain, int32_t vref_unit)
+{
+    int32_t raw_data = ADS1220_ReadData();
+    /* 24位ADC满量程为 2^23 = 8388608 */
+    int64_t voltage = ((int64_t)raw_data * vref_unit) / ((int64_t)8388608 * gain);
+    return (int32_t)voltage;
 }
 
 /**

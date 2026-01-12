@@ -334,7 +334,8 @@ uint8_t ADS1220_WaitForData(uint32_t timeout_ms);
  * @param  vref: 基准电压(V)
  * @retval 电压值(V)
  */
-float ADS1220_ReadVoltage(uint8_t gain, float vref);
+float ADS1220_ReadVoltage_Float(uint8_t gain, float vref);
+int32_t ADS1220_ReadVoltage_Int(uint8_t gain, int32_t vref_unit); // 整数版本
 
 /**
  * @brief  读取内部温度传感器值
