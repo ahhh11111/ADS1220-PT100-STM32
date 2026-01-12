@@ -46,9 +46,10 @@ typedef enum
  */
 typedef enum
 {
-    PT100_2WIRE = 0, /**< 2线制: 仅使用IDAC1，导线电阻影响大 */
-    PT100_3WIRE = 1, /**< 3线制: IDAC1+IDAC2，可消除导线电阻影响 */
-    PT100_4WIRE = 2  /**< 4线制: 仅IDAC1，测量精度最高 */
+    PT100_2WIRE = 0,              /**< 2线制: 仅使用IDAC1，导线电阻影响大 */
+    PT100_3WIRE = 1,              /**< 3线制: IDAC1+IDAC2，可消除导线电阻影响 */
+    PT100_4WIRE = 2,              /**< 4线制: 仅IDAC1，测量精度最高 */
+    PT100_3WIRE_RATIOMETRIC = 3   /**< 3线制硬件比例测量: 使用外部参考电阻，精度最高 */
 } PT100_WireMode_t;
 
 /**
@@ -66,8 +67,11 @@ typedef struct
     uint8_t input_n;           /**< 负输入通道(差分测量的负端，保留) */
 
     /* 接线模式配置 */
-    PT100_WireMode_t wire_mode; /**< 接线模式: 2线制/3线制/4线制 */
+    PT100_WireMode_t wire_mode; /**< 接线模式: 2线制/3线制/4线制/3线制比例测量 */
     uint8_t idac2_pin;          /**< IDAC2输出引脚 (用于3线制导线补偿) */
+    
+    /* 比例测量配置 (仅用于 PT100_3WIRE_RATIOMETRIC 模式) */
+    uint32_t rref_mohm;         /**< 参考电阻值 (mΩ)，典型值1000000mΩ=1000Ω或4020000mΩ=4.02kΩ */
 } PT100_Config_t;
 
 /* ====================================================================
