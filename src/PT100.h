@@ -46,10 +46,10 @@ typedef enum
  */
 typedef enum
 {
-    PT100_2WIRE = 0,              /**< 2线制: 仅使用IDAC1，导线电阻影响大 */
-    PT100_3WIRE = 1,              /**< 3线制: IDAC1+IDAC2，可消除导线电阻影响 */
-    PT100_4WIRE = 2,              /**< 4线制: 仅IDAC1，测量精度最高 */
-    PT100_3WIRE_RATIOMETRIC = 3   /**< 3线制硬件比例测量: 使用外部参考电阻，精度最高 */
+    PT100_2WIRE = 0,            /**< 2线制: 仅使用IDAC1，导线电阻影响大 */
+    PT100_3WIRE = 1,            /**< 3线制: IDAC1+IDAC2，可消除导线电阻影响 */
+    PT100_4WIRE = 2,            /**< 4线制: 仅IDAC1，测量精度最高 */
+    PT100_3WIRE_RATIOMETRIC = 3 /**< 3线制硬件比例测量: 使用外部参考电阻，精度最高 */
 } PT100_WireMode_t;
 
 /**
@@ -58,20 +58,27 @@ typedef enum
  */
 typedef struct
 {
-    /* 基本配置 */
-    PT100_Type_t type;         /**< PT100或PT1000类型 */
-    PT100_IDAC_Current_t idac; /**< 激励电流大小 */
-    uint8_t gain;              /**< PGA增益 (1, 2, 4, 8, 16, 32, 64, 128) */
-    uint16_t vref_mv;          /**< 基准电压 (mV)，通常为2048mV */
-    uint8_t input_p;           /**< 正输入通道(差分测量的正端) */
-    uint8_t input_n;           /**< 负输入通道(差分测量的负端，保留) */
+    /* -------- PT100 本体 -------- */
+    PT100_Type_t type;          /**< PT100 / PT1000 */
+    PT100_WireMode_t wire_mode; /**< 2/3/4线，仅用于算法 */
 
-    /* 接线模式配置 */
-    PT100_WireMode_t wire_mode; /**< 接线模式: 2线制/3线制/4线制/3线制比例测量 */
-    uint8_t idac2_pin;          /**< IDAC2输出引脚 (用于3线制导线补偿) */
-    
-    /* 比例测量配置 (仅用于 PT100_3WIRE_RATIOMETRIC 模式) */
-    uint32_t rref_mohm;         /**< 参考电阻值 (mΩ)，典型值1000000mΩ=1000Ω或4020000mΩ=4.02kΩ */
+    /* -------- ADC 输入 -------- */
+    uint8_t mux;  /**< ADS1220_MUX_AINx_AINy */
+    uint8_t gain; /**< PGA增益 */
+
+    /* -------- IDAC 配置 -------- */
+    PT100_IDAC_Current_t idac; /**< IDAC 电流大小 */
+    uint8_t idac1_pin;         /**< IDAC1 路由引脚 */
+    uint8_t idac2_pin;         /**< IDAC2 路由引脚（不用则 DISABLED） */
+
+    /* -------- 参考与滤波（完全显式） -------- */
+    uint8_t vref_sel; /**< ADS1220_VREF_INT / ADS1220_VREF_EXT_REF0 */
+    uint8_t fir_mode; /**< ADS1220_FIR_xxx */
+
+    /* -------- 参考配置 -------- */
+    uint16_t vref_mv;   /**< 绝对测量用 */
+    uint32_t rref_mohm; /**< 比例测量用 */
+
 } PT100_Config_t;
 
 /* ====================================================================
@@ -136,8 +143,8 @@ void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, in
  *        - PT100_ReadTemperature 返回 int32_t (0.01°C)
  *        - PT100_ResistanceToTemperature 参数和返回值均为 int32_t
  */
-#define PT100_ReadResistance(cfg)       PT100_ReadResistance_Int(cfg)
-#define PT100_ReadTemperature(cfg)      PT100_ReadTemperature_Int(cfg)
-#define PT100_ResistanceToTemperature(r, t)  PT100_ResistanceToTemperature_Int(r, t)
+#define PT100_ReadResistance(cfg) PT100_ReadResistance_Int(cfg)
+#define PT100_ReadTemperature(cfg) PT100_ReadTemperature_Int(cfg)
+#define PT100_ResistanceToTemperature(r, t) PT100_ResistanceToTemperature_Int(r, t)
 
 #endif /* __PT100_H */

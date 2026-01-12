@@ -417,20 +417,22 @@ uint8_t ADS1220_IsDataReady(void)
 }
 
 /**
- * @brief  等待数据就绪
- * @param  timeout_ms: 超时时间(毫秒)
+ * @brief  等待 ADS1220 数据就绪（基于轮询次数）
+ * @param  max_try: 最大轮询次数
  * @retval 1=数据就绪, 0=超时
  */
-uint8_t ADS1220_WaitForData(uint32_t timeout_ms)
+uint8_t ADS1220_WaitForData(uint32_t max_try)
 {
-    uint32_t start_ms = GetMillis();
-    while (!ADS1220_IsDataReady())
+    while (max_try--)
     {
-        if ((GetMillis() - start_ms) > timeout_ms)
-            return 0;
+        if (ADS1220_IsDataReady())
+        {
+            return 1;
+        }
     }
-    return 1;
+    return 0;
 }
+
 
 /**
  * @brief  读取24位ADC原始数据

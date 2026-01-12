@@ -1,10 +1,9 @@
 /**
  * @file    Delay.h
  * @brief   延时函数库 - 头文件
- * @details 提供三种延时实现方式，通过宏定义选择:
+ * @details 提供两种延时实现方式，通过宏定义选择:
  *          - ADS1220_DELAY_SYSTICK: SysTick定时器精确延时(推荐，精度±1μs)
  *          - ADS1220_DELAY_SIMPLE: 简单循环延时(精度±10μs)
- *          - ADS1220_DELAY_EXTERNAL: 外部自定义延时函数
  * @version 1.0
  * @date    2024-01-11
  * @note    适配STM32F103系列(标准外设库SPL)，可移植到其他平台
@@ -25,11 +24,11 @@
  * ==================================================================== */
 #ifndef ADS1220_DELAY_SYSTICK
 #ifndef ADS1220_DELAY_SIMPLE
-#ifndef ADS1220_DELAY_EXTERNAL
 #define ADS1220_DELAY_SYSTICK /**< 默认使用SysTick定时器延时 */
 #endif
 #endif
-#endif
+
+extern volatile uint32_t g_systick_ms;
 
 /* ====================================================================
  * 延时函数接口声明
@@ -78,25 +77,5 @@ uint32_t GetMillis(void);
 
 #endif /* ADS1220_DELAY_SYSTICK */
 
-/* 以下函数在外部延时模式下需要用户实现 */
-#if defined(ADS1220_DELAY_EXTERNAL)
-
-/**
- * @brief  外部延时初始化函数(用户实现)
- * @note   在外部延时模式下，用户需要实现此函数
- * @param  无
- * @retval 无
- */
-void Delay_Init(void);
-
-/**
- * @brief  外部获取毫秒时间戳函数(用户实现)
- * @note   在外部延时模式下，用户需要实现此函数
- * @param  无
- * @retval 当前毫秒时间戳
- */
-uint32_t GetMillis(void);
-
-#endif /* ADS1220_DELAY_EXTERNAL */
 
 #endif /* __DELAY_H */
