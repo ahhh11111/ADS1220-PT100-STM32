@@ -263,16 +263,16 @@ static int32_t PT100_ReadResistance_3Wire_Ratiometric(PT100_Config_t *config)
         return -1;
 
     /* 比例测量计算:
-     * Rpt100(mΩ) = (ADC_code * Rref(mΩ)) / (2^23 * Gain)
      * 
-     * 注意: 使用外部参考时，PGA增益需要考虑在内
-     * ADC_code已经包含了增益效果，但我们需要还原真实比例
+     * ADC输入电压 = I × Rpt100 (经过PGA放大)
+     * 参考电压 = I × Rref (不经过PGA)
      * 
-     * 实际公式: Rpt100 = (raw / 2^23) * Rref
-     * 因为ADC输入和参考都经过相同的电流源，增益不影响比例
+     * ADC_code / 2^23 = (I × Rpt100 × Gain) / (I × Rref)
+     * 
+     * 因此: Rpt100(mΩ) = (ADC_code × Rref(mΩ)) / (2^23 × Gain)
      */
     int64_t numerator = (int64_t)raw * (int64_t)config->rref_mohm;
-    int64_t denominator = 8388608LL;  /* 2^23 */
+    int64_t denominator = 8388608LL * (int64_t)config->gain;  /* 2^23 × Gain */
     
     return (int32_t)(numerator / denominator);
 }
