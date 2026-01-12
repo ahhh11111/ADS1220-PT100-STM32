@@ -1,0 +1,26 @@
+# Build artifacts
+*.o
+*.obj
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.d
+
+# IDE files
+.vscode/
+*.uvprojx
+*.uvoptx
+*.uvguix.*
+.project
+.cproject
+.settings/
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# CodeQL artifacts
+_codeql_detected_source_root
