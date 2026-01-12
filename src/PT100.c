@@ -18,20 +18,36 @@
 #define PT1000_R0_MOHM 1000000    /**< PT1000在0°C时的标称电阻(mΩ) = 1000Ω */
 
 /* ====================================================================
- * PT100电阻-温度查找表
+ * PT100电阻-温度查找表 (扩展版)
  * 使用Callendar-Van Dusen方程预计算
- * 温度范围: -50°C ~ +500°C, 步进10°C
+ * 温度范围: -200°C ~ +850°C, 步进10°C
  * 电阻单位: mΩ（毫欧姆）
  * ==================================================================== */
 
-/* PT100电阻值表 (mΩ)，对应温度从-50°C到500°C，步进10°C */
+/* PT100电阻值表 (mΩ)，对应温度从-200°C到850°C，步进10°C */
 static const int32_t PT100_R_TABLE[] = {
-    /* -50°C to -10°C */
-    80306,   /* -50°C: 80.306Ω */
-    84271,   /* -40°C: 84.271Ω */
-    88222,   /* -30°C: 88.222Ω */
-    92160,   /* -20°C: 92.160Ω */
-    96086,   /* -10°C: 96.086Ω */
+    /* -200°C to -110°C */
+    18520,   /* -200°C: 18.520Ω (Callendar-Van Dusen) */
+    22830,   /* -190°C: 22.830Ω */
+    27100,   /* -180°C: 27.100Ω */
+    31340,   /* -170°C: 31.340Ω */
+    35540,   /* -160°C: 35.540Ω */
+    39720,   /* -150°C: 39.720Ω */
+    43880,   /* -140°C: 43.880Ω */
+    48000,   /* -130°C: 48.000Ω */
+    52110,   /* -120°C: 52.110Ω */
+    56190,   /* -110°C: 56.190Ω */
+    /* -100°C to -10°C */
+    60260,   /* -100°C: 60.260Ω */
+    64300,   /*  -90°C: 64.300Ω */
+    68330,   /*  -80°C: 68.330Ω */
+    72330,   /*  -70°C: 72.330Ω */
+    76330,   /*  -60°C: 76.330Ω */
+    80306,   /*  -50°C: 80.306Ω */
+    84271,   /*  -40°C: 84.271Ω */
+    88222,   /*  -30°C: 88.222Ω */
+    92160,   /*  -20°C: 92.160Ω */
+    96086,   /*  -10°C: 96.086Ω */
     /* 0°C to 90°C */
     100000,  /*   0°C: 100.000Ω */
     103903,  /*  10°C: 103.903Ω */
@@ -76,7 +92,7 @@ static const int32_t PT100_R_TABLE[] = {
     236695,  /* 370°C: 236.695Ω */
     240169,  /* 380°C: 240.169Ω */
     243631,  /* 390°C: 243.631Ω */
-    /* 400°C to 500°C */
+    /* 400°C to 490°C */
     247082,  /* 400°C: 247.082Ω */
     250521,  /* 410°C: 250.521Ω */
     253948,  /* 420°C: 253.948Ω */
@@ -87,17 +103,56 @@ static const int32_t PT100_R_TABLE[] = {
     270909,  /* 470°C: 270.909Ω */
     274266,  /* 480°C: 274.266Ω */
     277611,  /* 490°C: 277.611Ω */
-    280944   /* 500°C: 280.944Ω */
+    /* 500°C to 590°C */
+    280944,  /* 500°C: 280.944Ω */
+    284266,  /* 510°C: 284.266Ω */
+    287576,  /* 520°C: 287.576Ω */
+    290874,  /* 530°C: 290.874Ω */
+    294160,  /* 540°C: 294.160Ω */
+    297434,  /* 550°C: 297.434Ω */
+    300697,  /* 560°C: 300.697Ω */
+    303947,  /* 570°C: 303.947Ω */
+    307186,  /* 580°C: 307.186Ω */
+    310413,  /* 590°C: 310.413Ω */
+    /* 600°C to 690°C */
+    313628,  /* 600°C: 313.628Ω */
+    316831,  /* 610°C: 316.831Ω */
+    320022,  /* 620°C: 320.022Ω */
+    323202,  /* 630°C: 323.202Ω */
+    326370,  /* 640°C: 326.370Ω */
+    329526,  /* 650°C: 329.526Ω */
+    332670,  /* 660°C: 332.670Ω */
+    335802,  /* 670°C: 335.802Ω */
+    338922,  /* 680°C: 338.922Ω */
+    342030,  /* 690°C: 342.030Ω */
+    /* 700°C to 790°C */
+    345126,  /* 700°C: 345.126Ω */
+    348210,  /* 710°C: 348.210Ω */
+    351282,  /* 720°C: 351.282Ω */
+    354342,  /* 730°C: 354.342Ω */
+    357390,  /* 740°C: 357.390Ω */
+    360426,  /* 750°C: 360.426Ω */
+    363450,  /* 760°C: 363.450Ω */
+    366462,  /* 770°C: 366.462Ω */
+    369462,  /* 780°C: 369.462Ω */
+    372450,  /* 790°C: 372.450Ω */
+    /* 800°C to 850°C */
+    375426,  /* 800°C: 375.426Ω */
+    378390,  /* 810°C: 378.390Ω */
+    381342,  /* 820°C: 381.342Ω */
+    384282,  /* 830°C: 384.282Ω */
+    387210,  /* 840°C: 387.210Ω */
+    390126   /* 850°C: 390.126Ω */
 };
 
-#define PT100_TABLE_SIZE    56       /**< 查找表大小 */
-#define PT100_TABLE_T_MIN   (-5000)  /**< 最小温度 (0.01°C) = -50°C */
-#define PT100_TABLE_T_MAX   (50000)  /**< 最大温度 (0.01°C) = 500°C */
+#define PT100_TABLE_SIZE    106      /**< 查找表大小 (-200°C到850°C，步进10°C，共106个点) */
+#define PT100_TABLE_T_MIN   (-20000) /**< 最小温度 (0.01°C) = -200°C */
+#define PT100_TABLE_T_MAX   (85000)  /**< 最大温度 (0.01°C) = 850°C */
 #define PT100_TABLE_T_STEP  (1000)   /**< 温度步进 (0.01°C) = 10°C */
 
 /* 线性外推使用的温度系数 (mΩ/°C) */
-#define PT100_DRDT_AT_MINUS50 396    /**< -50°C处的dR/dT ≈ 0.396 Ω/°C = 396 mΩ/°C */
-#define PT100_DRDT_AT_PLUS500 333    /**< 500°C处的dR/dT ≈ 0.333 Ω/°C = 333 mΩ/°C */
+#define PT100_DRDT_AT_MINUS200 427   /**< -200°C处的dR/dT ≈ 0.427 Ω/°C = 427 mΩ/°C */
+#define PT100_DRDT_AT_PLUS850  291   /**< 850°C处的dR/dT ≈ 0.291 Ω/°C = 291 mΩ/°C */
 
 /* ====================================================================
  * 私有辅助函数
@@ -176,12 +231,63 @@ static int32_t PT100_ReadResistance_Absolute(PT100_Config_t *config)
 }
 
 /**
+ * @brief  读取PT100电阻（3线制硬件比例测量法）
+ * @param  config: PT100配置参数指针
+ * @retval 电阻值(mΩ毫欧)，失败返回-1
+ * 
+ * @note   硬件比例测量原理:
+ *         电路连接:
+ *           IDAC1 -> AIN0 -> PT100 -> AIN1 -> Rref -> GND
+ *           IDAC2 -> AIN3 (导线补偿，与IDAC1电流相同)
+ *         
+ *         ADC输入: AIN0-AIN1 测量PT100两端电压
+ *         ADC参考: REFP0-REFN0 = Rref两端电压 (IDAC1 * Rref)
+ *         
+ *         比例计算:
+ *           ADC_code / 2^23 = (I * Rpt100) / (I * Rref) = Rpt100 / Rref
+ *           Rpt100 = ADC_code * Rref / 2^23
+ *         
+ *         优点:
+ *         1. 电流源漂移被消除 (比例测量)
+ *         2. 参考电压精度不影响结果
+ *         3. 3线制可消除导线电阻
+ */
+static int32_t PT100_ReadResistance_3Wire_Ratiometric(PT100_Config_t *config)
+{
+    int32_t raw = PT100_ReadADCRaw();
+    if (raw == 0x7FFFFFFF)
+        return -1;
+
+    /* 检查参考电阻值是否有效 */
+    if (config->rref_mohm == 0)
+        return -1;
+
+    /* 比例测量计算:
+     * 
+     * ADC输入电压 = I × Rpt100 (经过PGA放大)
+     * 参考电压 = I × Rref (不经过PGA)
+     * 
+     * ADC_code / 2^23 = (I × Rpt100 × Gain) / (I × Rref)
+     * 
+     * 因此: Rpt100(mΩ) = (ADC_code × Rref(mΩ)) / (2^23 × Gain)
+     */
+    int64_t numerator = (int64_t)raw * (int64_t)config->rref_mohm;
+    int64_t denominator = 8388608LL * (int64_t)config->gain;  /* 2^23 × Gain */
+    
+    return (int32_t)(numerator / denominator);
+}
+
+/**
  * @brief  读取PT100电阻值
  * @param  config: PT100配置参数指针
  * @retval 电阻值(mΩ毫欧)，失败返回负值
  */
 int32_t PT100_ReadResistance_Int(PT100_Config_t *config)
 {
+    if (config->wire_mode == PT100_3WIRE_RATIOMETRIC)
+    {
+        return PT100_ReadResistance_3Wire_Ratiometric(config);
+    }
     return PT100_ReadResistance_Absolute(config);
 }
 
@@ -208,14 +314,14 @@ int32_t PT100_ResistanceToTemperature_Int(int32_t resistance_mohm, PT100_Type_t 
         /* 低于最小值，使用线性外推 */
         /* dT = (R - R_min) / dR_dT, 单位0.01°C */
         int32_t delta_r = r_mohm - PT100_R_TABLE[0];
-        return PT100_TABLE_T_MIN + (delta_r * 100) / PT100_DRDT_AT_MINUS50;
+        return PT100_TABLE_T_MIN + (delta_r * 100) / PT100_DRDT_AT_MINUS200;
     }
     
     if (r_mohm >= PT100_R_TABLE[PT100_TABLE_SIZE - 1])
     {
         /* 高于最大值，使用线性外推 */
         int32_t delta_r = r_mohm - PT100_R_TABLE[PT100_TABLE_SIZE - 1];
-        return PT100_TABLE_T_MAX + (delta_r * 100) / PT100_DRDT_AT_PLUS500;
+        return PT100_TABLE_T_MAX + (delta_r * 100) / PT100_DRDT_AT_PLUS850;
     }
     
     /* 二分查找找到电阻值所在的区间 */
@@ -313,9 +419,17 @@ void PT100_Init(PT100_Config_t *config)
     ads_config.reg1 = ADS1220_DR_20SPS | ADS1220_MODE_NORMAL | ADS1220_CM_SINGLE | ADS1220_TS_DISABLED;
 
     /* Reg2: 基准电压 + FIR + IDAC电流 */
-    // 默认使用内部2.048V基准 (软件比例法也依赖内部基准进行电压量化)
     // 启用 50Hz/60Hz 同时抑制滤波器
-    ads_config.reg2 = ADS1220_VREF_INT | ADS1220_FIR_50HZ_60HZ | (config->idac & 0x07);
+    if (config->wire_mode == PT100_3WIRE_RATIOMETRIC)
+    {
+        // 比例测量模式: 使用外部参考 (REFP0-REFN0 = Rref两端电压)
+        ads_config.reg2 = ADS1220_VREF_EXT_REF0 | ADS1220_FIR_50HZ_60HZ | (config->idac & 0x07);
+    }
+    else
+    {
+        // 绝对测量模式: 使用内部2.048V基准
+        ads_config.reg2 = ADS1220_VREF_INT | ADS1220_FIR_50HZ_60HZ | (config->idac & 0x07);
+    }
 
     /* Reg3: IDAC路由 */
     uint8_t i1mux = ADS1220_I1MUX_DISABLED;
@@ -327,10 +441,10 @@ void PT100_Init(PT100_Config_t *config)
     else if ((config->input_p & 0xF0) == ADS1220_MUX_AIN1_AIN2) i1mux = ADS1220_I1MUX_AIN1;
     else i1mux = ADS1220_I1MUX_AIN0; // 默认
 
-    // 如果是3线制，需要配置 IDAC2
-    if (config->wire_mode == PT100_3WIRE)
+    // 如果是3线制或3线制比例测量，需要配置 IDAC2
+    if (config->wire_mode == PT100_3WIRE || config->wire_mode == PT100_3WIRE_RATIOMETRIC)
     {
-        i2mux = config->idac2_pin; // 使用用户指定的引脚 (例如 ADS1220_I2MUX_AIN2)
+        i2mux = config->idac2_pin; // 使用用户指定的引脚 (例如 ADS1220_I2MUX_AIN3)
     }
     
     ads_config.reg3 = i1mux | i2mux | ADS1220_DRDYM_DRDY_ONLY;

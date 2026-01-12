@@ -187,6 +187,106 @@ void PT100_MeasureExample_3Wire(void)
 }
 
 /**
+ * @brief  PT100测量示例 (3线制硬件比例测量)
+ * @note   使用外部参考电阻进行比例测量，精度最高
+ *         温度范围: -200°C 至 +850°C
+ *         电阻单位mΩ，温度单位0.01°C
+ * 
+ * @details 硬件连接说明:
+ *          ┌─────────────────────────────────────────────────────────────┐
+ *          │                    ADS1220 3线制比例测量电路                  │
+ *          ├─────────────────────────────────────────────────────────────┤
+ *          │                                                             │
+ *          │    IDAC1 ──┬── AIN0 ──┬── PT100 ──┬── AIN1 ──┬── Rref ── GND │
+ *          │            │          │           │          │              │
+ *          │            │          └───────────┘          │              │
+ *          │            │        (测量PT100电压)          │              │
+ *          │            │                                 │              │
+ *          │            └── REFP0                   REFN0 ─┘              │
+ *          │               (参考电压 = IDAC1 × Rref)                      │
+ *          │                                                             │
+ *          │    IDAC2 ──── AIN3 ──── 导线 ──── AIN1                       │
+ *          │               (3线制导线补偿)                                │
+ *          │                                                             │
+ *          │    Rref: 推荐使用高精度电阻 (如1kΩ或4.02kΩ，精度0.1%)        │
+ *          │                                                             │
+ *          └─────────────────────────────────────────────────────────────┘
+ *          
+ *          比例测量原理:
+ *            Rpt100 / Rref = (IDAC × Rpt100) / (IDAC × Rref) = Vpt100 / Vref
+ *            ADC输出 = (Vpt100 / Vref) × 2^23
+ *            Rpt100 = ADC × Rref / 2^23
+ *          
+ *          优点:
+ *            1. IDAC电流漂移被消除
+ *            2. 不依赖内部参考电压精度
+ *            3. 3线制消除导线电阻影响
+ */
+void PT100_MeasureExample_3Wire_Ratiometric(void)
+{
+    PT100_Config_t pt100_config;
+    int32_t temperature, resistance;
+    uint32_t count = 0;
+
+    printf("\r\n========================================\r\n");
+    printf("  PT100温度测量 (3线制硬件比例测量)\r\n");
+    printf("  测量范围: -200°C 至 +850°C\r\n");
+    printf("  IDAC1->AIN0, IDAC2->AIN3 (导线补偿)\r\n");
+    printf("  参考电阻: Rref=1000Ω (外部REFP0-REFN0)\r\n");
+    printf("  纯整数运算，无浮点\r\n");
+    printf("========================================\r\n");
+
+    /* 配置PT100参数 (3线制硬件比例测量) */
+    pt100_config.type = PT100_TYPE;
+    pt100_config.idac = PT100_IDAC_500UA;            /* 500μA激励电流 (适合高温测量) */
+    pt100_config.gain = 4;                           /* 增益4倍 */
+    pt100_config.vref_mv = 0;                        /* 比例测量不使用此参数 */
+    pt100_config.input_p = ADS1220_MUX_AIN0_AIN1;    /* PT100测量通道: AIN0-AIN1 */
+    pt100_config.wire_mode = PT100_3WIRE_RATIOMETRIC;/* 3线制比例测量模式 */
+    pt100_config.idac2_pin = ADS1220_I2MUX_AIN3;     /* IDAC2输出到AIN3 (导线补偿) */
+    pt100_config.rref_mohm = 1000000;                /* 参考电阻1000Ω = 1000000mΩ */
+
+    PT100_Init(&pt100_config);
+
+    printf("配置完成，开始测量...\r\n");
+    printf("提示: 3线制比例测量精度最高，可消除IDAC漂移和导线电阻\r\n\r\n");
+
+    for (int i = 0; i < 5; i++) /* 测量5次后退出 */
+    {
+        resistance = PT100_ReadResistance_Int(&pt100_config);
+
+        if (resistance > 0)
+        {
+            temperature = PT100_ResistanceToTemperature_Int(resistance, PT100_TYPE);
+
+            /* 输出: 电阻mΩ转Ω，温度0.01°C转°C */
+            /* 温度范围示例: -20000 = -200.00°C, 85000 = 850.00°C */
+            printf("[%lu] [运行:%lus] 电阻: %ld.%03ldΩ, 温度: ",
+                   ++count, GetMillis() / 1000,
+                   (long)(resistance / 1000), (long)(resistance % 1000));
+            
+            /* 处理负温度显示 */
+            if (temperature < 0)
+            {
+                printf("-%ld.%02ld°C\r\n",
+                       (long)((-temperature) / 100), (long)((-temperature) % 100));
+            }
+            else
+            {
+                printf("%ld.%02ld°C\r\n",
+                       (long)(temperature / 100), (long)(temperature % 100));
+            }
+        }
+        else
+        {
+            printf("[%lu] 读取错误! (错误码: %d)\r\n", ++count, ADS1220_GetLastError());
+        }
+
+        Delay_ms(1000);
+    }
+}
+
+/**
  * @brief  主函数
  */
 int main(void)
@@ -201,8 +301,9 @@ int main(void)
     printf("========================================\r\n");
     printf("  ADS1220 + PT100 温度测量系统\r\n");
     printf("  STM32F103C8T6 @ 72MHz\r\n");
-    printf("  固件版本: v2.0\r\n");
+    printf("  固件版本: v2.1\r\n");
     printf("  计算模式: 纯整数运算(无FPU)\r\n");
+    printf("  温度范围: -200°C 至 +850°C\r\n");
     printf("  温度精度: ±0.1°C\r\n");
     printf("========================================\r\n");
 
@@ -224,6 +325,11 @@ int main(void)
 
     // PT100测量示例 - 3线制
     PT100_MeasureExample_3Wire();
+
+    Delay_ms(2000);
+
+    // PT100测量示例 - 3线制硬件比例测量 (推荐，精度最高)
+    PT100_MeasureExample_3Wire_Ratiometric();
 
     printf("\r\n所有测试完成!\r\n");
 

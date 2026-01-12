@@ -26,11 +26,13 @@
 ### PT100温度测量
 - 🌡️ **PT100/PT1000支持** - 自动识别
 - 🎯 **高精度算法** - 查表+线性插值，精度±0.1°C
+- 🌡️ **宽温度范围** - -200°C 至 +850°C
 - ⚡ **可配置激励电流** - 10μA ~ 1500μA
 - 🔧 **灵活配置** - 增益、采样率、滤波器
 - 📊 **直接温度输出** - 自动电阻-温度转换
 - 🛠️ **校准功能** - 单点校准支持
 - 🔢 **纯整数运算** - 适用于无FPU的MCU（如STM32F103）
+- ✅ **3线制比例测量** - 硬件比例测量，消除IDAC漂移和导线电阻
 
 ---
 
@@ -135,6 +137,40 @@ int main(void)
                  │  REFP0  │──── 外部2. 5V基准(可选)
                  │  REFN0  │──── GND
                  └─────────┘
+```
+
+### PT100连接（三线制硬件比例测量，推荐）
+
+```
+三线制比例测量电路 (精度最高，温度范围: -200°C 至 +850°C)
+
+                      ADS1220
+                     ┌─────────┐
+    IDAC1 ───────────┤ AIN0    │◄── PT100正极
+                     │         │
+                     │ AIN1    │◄── PT100负极 + Rref上端
+                     │         │
+    IDAC2 ───────────┤ AIN3    │◄── 导线补偿 (连接到PT100负极导线)
+                     │         │
+                     │ REFP0   │◄── 连接到AIN1 (Rref上端)
+                     │         │
+                     │ REFN0   │◄── 连接到GND (Rref下端)
+                     │         │
+                     └─────────┘
+                           │
+                        ┌──┴──┐
+                        │Rref │  参考电阻 (推荐1kΩ, 精度0.1%)
+                        └──┬──┘
+                           │
+                          GND
+
+电流路径:
+  IDAC1 → AIN0 → PT100 → AIN1 → Rref → GND
+  IDAC2 → AIN3 → 导线 → AIN1 (补偿导线电阻)
+
+比例测量原理:
+  Rpt100 = ADC_code × Rref / 2^23
+  (IDAC漂移被消除，不依赖参考电压精度)
 ```
 
 ---
@@ -322,6 +358,62 @@ for (int i = 0; i < 4; i++)
 }
 ```
 
+### 示例4: PT100三线制硬件比例测量 (-200°C至+850°C)
+
+```c
+#include "PT100.h"
+
+/**
+ * @brief  3线制比例测量示例
+ * @note   使用外部参考电阻，精度最高
+ *         温度范围: -200°C 至 +850°C
+ * 
+ * 硬件连接:
+ *   IDAC1 → AIN0 → PT100 → AIN1 → Rref(1kΩ) → GND
+ *   IDAC2 → AIN3 → 导线 → AIN1 (导线补偿)
+ *   REFP0 接 AIN1, REFN0 接 GND
+ */
+int main(void)
+{
+    ADS1220_Init();
+    
+    PT100_Config_t pt100 = {
+        .type = PT100_TYPE,
+        .idac = PT100_IDAC_500UA,            // 500μA激励电流
+        .gain = 4,                           // 增益4倍
+        .vref_mv = 0,                        // 比例测量不使用此参数
+        .input_p = ADS1220_MUX_AIN0_AIN1,    // PT100测量通道
+        .wire_mode = PT100_3WIRE_RATIOMETRIC,// 3线制比例测量模式
+        .idac2_pin = ADS1220_I2MUX_AIN3,     // IDAC2输出到AIN3 (导线补偿)
+        .rref_mohm = 1000000                 // 参考电阻1000Ω = 1000000mΩ
+    };
+    
+    PT100_Init(&pt100);
+    
+    while(1)
+    {
+        int32_t temp = PT100_ReadTemperature_Int(&pt100);  // 单位: 0.01°C
+        int32_t res = PT100_ReadResistance_Int(&pt100);    // 单位: mΩ
+        
+        // 处理负温度显示
+        if (temp < 0)
+        {
+            printf("Temperature: -%ld.%02ld °C\n", 
+                   (long)((-temp) / 100), (long)((-temp) % 100));
+        }
+        else
+        {
+            printf("Temperature: %ld.%02ld °C\n", 
+                   (long)(temp / 100), (long)(temp % 100));
+        }
+        printf("Resistance: %ld.%03ld Ω\n", 
+               (long)(res / 1000), (long)(res % 1000));
+        
+        Delay_ms(1000);
+    }
+}
+```
+
 ---
 
 ## 📊 性能指标
@@ -334,5 +426,6 @@ for (int i = 0; i < 4; i++)
 | 采样率 | 20 ~ 2000 SPS | 可配置 |
 | SPI时钟 | 最高4MHz | 实际使用2.25MHz |
 | 温度精度 | ±0.1°C | 使用查表+线性插值 |
+| 温度范围 | -200°C ~ +850°C | 比例测量模式 |
 
 ---
