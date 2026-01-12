@@ -29,6 +29,7 @@
 - 🔧 **灵活配置** - 增益、采样率、滤波器
 - 📊 **直接温度输出** - 自动电阻-温度转换
 - 🛠️ **校准功能** - 单点/多点校准支持
+- 🔢 **整数运算模式** - 适用于无FPU的MCU（如STM32F103），精度±0.1°C
 
 ---
 
@@ -63,6 +64,8 @@ cd ADS1220-PT100-STM32
 
 ### 3. 基本使用
 
+#### 整数模式（无FPU，推荐用于STM32F103）
+
 ```c
 #include "ADS1220.h"
 #include "PT100.h"
@@ -75,7 +78,49 @@ int main(void)
     // 初始化ADS1220
     ADS1220_Init();
     
-    // 配置PT100测量
+    // 配置PT100测量（整数模式）
+    PT100_Config_t pt100_config = {
+        .type = PT100_TYPE,
+        .idac = PT100_IDAC_250UA,
+        .gain = 8,
+        .vref_mv = 2048,  // 2048mV = 2.048V
+        .input_p = ADS1220_MUX_AIN0_AIN1,
+        .use_ratiometric = 0,
+        .wire_mode = PT100_2WIRE
+    };
+    
+    PT100_Init(&pt100_config);
+    
+    while(1)
+    {
+        // 读取温度（单位：0.01°C）
+        int32_t temperature = PT100_ReadTemperature_Int(&pt100_config);
+        
+        // 输出格式转换：2500 -> 25.00°C
+        printf("Temperature: %ld.%02ld °C\n", 
+               (long)(temperature / 100), 
+               (long)(temperature >= 0 ? temperature % 100 : (-temperature) % 100));
+        
+        Delay_ms(1000);
+    }
+}
+```
+
+#### 浮点模式（有FPU的MCU）
+
+```c
+#include "ADS1220.h"
+#include "PT100.h"
+
+int main(void)
+{
+    // 系统初始化
+    SystemInit();
+    
+    // 初始化ADS1220
+    ADS1220_Init();
+    
+    // 配置PT100测量（浮点模式）
     PT100_Config_t pt100_config = {
         .type = PT100_TYPE,
         .idac = PT100_IDAC_250UA,
@@ -134,7 +179,28 @@ int main(void)
 
 ## ⚙️ 配置选项
 
-### 1. SPI模式选择
+### 1. 整数/浮点模式选择（PT100测量）
+
+在 `PT100.h` 中：
+
+```c
+// 使用整数运算模式 (适用于无FPU的MCU如STM32F103，默认开启)
+#define PT100_USE_INTEGER_MATH
+
+// 使用浮点运算模式 (适用于有FPU的MCU)
+// 注释掉上面的宏定义即可切换到浮点模式
+```
+
+| 模式 | 精度 | 适用MCU | 说明 |
+|------|------|---------|------|
+| 整数模式 | ±0.1°C | STM32F103等无FPU的MCU | 使用查表+线性插值，无需浮点运算 |
+| 浮点模式 | 更高精度 | STM32F4等有FPU的MCU | 使用Callendar-Van Dusen方程 |
+
+**整数模式单位说明:**
+- 电阻: mΩ（毫欧姆），例如 100000mΩ = 100Ω
+- 温度: 0.01°C（百分之一摄氏度），例如 2500 = 25.00°C
+
+### 2. SPI模式选择
 
 在 `ADS1220.h` 中：
 
@@ -146,7 +212,7 @@ int main(void)
 #define ADS1220_USE_SOFTWARE_SPI
 ```
 
-### 2. 延时函数选择
+### 3. 延时函数选择
 
 ```c
 // 选项1: SysTick精确延时 (推荐)
@@ -165,7 +231,7 @@ int main(void)
 | 简单循环 | ±10μs | 无 | 资源受限 |
 | 外部函数 | 自定义 | 自定义 | 已有延时系统 |
 
-### 3. 引脚配置
+### 4. 引脚配置
 
 修改 `ADS1220.h` 中的引脚定义：
 
@@ -213,6 +279,18 @@ void ADS1220_SetConversionMode(uint8_t mode);
 ```
 
 ### PT100 测量函数
+
+#### 整数模式（无FPU的MCU）
+
+```c
+void PT100_Init(PT100_Config_t *config);
+int32_t PT100_ReadResistance_Int(PT100_Config_t *config);   // 返回值单位: mΩ
+int32_t PT100_ReadTemperature_Int(PT100_Config_t *config);  // 返回值单位: 0.01°C
+int32_t PT100_ResistanceToTemperature_Int(int32_t resistance_mohm, PT100_Type_t type);
+void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, int32_t *offset_centideg);
+```
+
+#### 浮点模式（有FPU的MCU）
 
 ```c
 void PT100_Init(PT100_Config_t *config);
