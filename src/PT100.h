@@ -4,7 +4,6 @@
  * @details 基于ADS1220实现高精度PT100/PT1000温度测量
  *          支持多种接线方式、温度转换等功能
  *          使用纯整数运算模式，适合无FPU的MCU如STM32F103
- *          比例测量由ADS1220硬件实现
  * @version 2.0
  * @date    2026-01-12
  * @note    使用查表+线性插值实现温度转换，精度优于±0.1°C
@@ -55,7 +54,6 @@ typedef enum
 /**
  * @brief PT100配置结构体
  * @details 所有参数使用整数表示，避免浮点运算
- *          比例测量由ADS1220硬件实现，软件仅需配置基本参数
  */
 typedef struct
 {
@@ -129,7 +127,7 @@ int32_t PT100_ResistanceToTemperature_Int(int32_t resistance_mohm, PT100_Type_t 
 void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, int32_t *offset_centideg);
 
 /**
- * @brief 兼容性宏定义 - 将通用API名称映射到整数API
+ * @brief 便捷宏定义 - 提供简短的API名称
  * @note  - PT100_ReadResistance 返回 int32_t (mΩ)
  *        - PT100_ReadTemperature 返回 int32_t (0.01°C)
  *        - PT100_ResistanceToTemperature 参数和返回值均为 int32_t
