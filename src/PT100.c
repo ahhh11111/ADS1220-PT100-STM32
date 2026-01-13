@@ -209,17 +209,14 @@ static int32_t PT100_ReadADCRaw(void)
  * ==================================================================== */
 
 /**
- * @brief  读取PT100电阻（绝对测量法）
+ * @brief  从ADC原始值计算电阻（绝对测量法）
  * @param  config: PT100配置参数指针
- * @retval 电阻值(mΩ毫欧)，失败返回-1
+ * @param  raw: ADC原始值
+ * @retval 电阻值(mΩ)，失败返回-1
  * @note   公式: R(mΩ) = V / I = (ADC * Vref_mv * 1000) / (2^23 * Gain * I_uA)
  */
-static int32_t PT100_ReadResistance_Absolute(PT100_Config_t *config)
+static int32_t PT100_CalcResistance_Absolute(PT100_Config_t *config, int32_t raw)
 {
-    int32_t raw = PT100_ReadADCRaw();
-    if (raw == 0x7FFFFFFF)
-        return -1;
-
     /* 获取IDAC电流(μA) */
     uint16_t current_ua = PT100_GetIDACCurrent(config->idac);
     if (current_ua == 0)
@@ -240,9 +237,10 @@ static int32_t PT100_ReadResistance_Absolute(PT100_Config_t *config)
 }
 
 /**
- * @brief  读取PT100电阻（3线制硬件比例测量法）
+ * @brief  从ADC原始值计算电阻（3线制硬件比例测量法）
  * @param  config: PT100配置参数指针
- * @retval 电阻值(mΩ毫欧)，失败返回-1
+ * @param  raw: ADC原始值
+ * @retval 电阻值(mΩ)，失败返回-1
  *
  * @note   硬件比例测量原理:
  *
@@ -255,22 +253,18 @@ static int32_t PT100_ReadResistance_Absolute(PT100_Config_t *config)
  *         2. 参考电压精度不影响结果
  *         3. 3线制可消除导线电阻
  */
-static int32_t PT100_ReadResistance_3Wire_Ratiometric(PT100_Config_t *config)
+static int32_t PT100_CalcResistance_3Wire_Ratiometric(PT100_Config_t *config, int32_t raw)
 {
-    int32_t raw = PT100_ReadADCRaw();
-    if (raw == 0x7FFFFFFF)
-        return -1;
-
     /* 检查参考电阻值是否有效 */
     if (config->rref_mohm == 0)
         return -1;
 
-    /* * 修正：3线制下，流过Rref的电流是流过PT100电流的2倍 (IDAC1 + IDAC2)
+    /* 修正：3线制下，流过Rref的电流是流过PT100电流的2倍 (IDAC1 + IDAC2)
      * 公式: Rpt100 = (ADC_code * 2 * Rref) / (2^23 * Gain)
      */
     int64_t numerator = (int64_t)raw * (int64_t)config->rref_mohm;
 
-    // 如果是3线制，分子需要乘以2
+    /* 如果是3线制，分子需要乘以2 */
     if (config->wire_mode == PT100_3WIRE_RATIOMETRIC)
     {
         numerator *= 2;
@@ -279,6 +273,34 @@ static int32_t PT100_ReadResistance_3Wire_Ratiometric(PT100_Config_t *config)
     int64_t denominator = 8388608LL * (int64_t)config->gain;
 
     return (int32_t)(numerator / denominator);
+}
+
+/**
+ * @brief  读取PT100电阻（绝对测量法）
+ * @param  config: PT100配置参数指针
+ * @retval 电阻值(mΩ毫欧)，失败返回-1
+ */
+static int32_t PT100_ReadResistance_Absolute(PT100_Config_t *config)
+{
+    int32_t raw = PT100_ReadADCRaw();
+    if (raw == 0x7FFFFFFF)
+        return -1;
+
+    return PT100_CalcResistance_Absolute(config, raw);
+}
+
+/**
+ * @brief  读取PT100电阻（3线制硬件比例测量法）
+ * @param  config: PT100配置参数指针
+ * @retval 电阻值(mΩ毫欧)，失败返回-1
+ */
+static int32_t PT100_ReadResistance_3Wire_Ratiometric(PT100_Config_t *config)
+{
+    int32_t raw = PT100_ReadADCRaw();
+    if (raw == 0x7FFFFFFF)
+        return -1;
+
+    return PT100_CalcResistance_3Wire_Ratiometric(config, raw);
 }
 
 /**
@@ -394,54 +416,6 @@ void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, in
 void PT100_StartMeasurement(void)
 {
     ADS1220_StartConversion();
-}
-
-/**
- * @brief  从ADC原始值计算电阻（绝对测量法）
- * @param  config: PT100配置参数指针
- * @param  raw: ADC原始值
- * @retval 电阻值(mΩ)，失败返回-1
- */
-static int32_t PT100_CalcResistance_Absolute(PT100_Config_t *config, int32_t raw)
-{
-    /* 获取IDAC电流(μA) */
-    uint16_t current_ua = PT100_GetIDACCurrent(config->idac);
-    if (current_ua == 0)
-        return -1;
-
-    /* 计算电阻: R(mΩ) = V / I
-     * 使用64位中间变量避免溢出
-     */
-    int64_t numerator = (int64_t)raw * (int64_t)config->vref_mv * 1000000LL;
-    int64_t denominator = 8388608LL * (int64_t)config->gain * (int64_t)current_ua;
-
-    return (int32_t)(numerator / denominator);
-}
-
-/**
- * @brief  从ADC原始值计算电阻（3线制硬件比例测量法）
- * @param  config: PT100配置参数指针
- * @param  raw: ADC原始值
- * @retval 电阻值(mΩ)，失败返回-1
- */
-static int32_t PT100_CalcResistance_3Wire_Ratiometric(PT100_Config_t *config, int32_t raw)
-{
-    /* 检查参考电阻值是否有效 */
-    if (config->rref_mohm == 0)
-        return -1;
-
-    /* 修正：3线制下，流过Rref的电流是流过PT100电流的2倍 (IDAC1 + IDAC2) */
-    int64_t numerator = (int64_t)raw * (int64_t)config->rref_mohm;
-
-    /* 如果是3线制，分子需要乘以2 */
-    if (config->wire_mode == PT100_3WIRE_RATIOMETRIC)
-    {
-        numerator *= 2;
-    }
-
-    int64_t denominator = 8388608LL * (int64_t)config->gain;
-
-    return (int32_t)(numerator / denominator);
 }
 
 /**
