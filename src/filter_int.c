@@ -2,7 +2,7 @@
 #include <math.h>  /* 仅用于初始化时的 alpha 计算 */
 
 /*================================================================================================*/
-/* 1. 简单平均滤波器（整数版本）                                                                  */
+/* 1. 简单平均滤波器（整数版本，支持 int32_t）                                                    */
 /*================================================================================================*/
 
 /**
@@ -36,22 +36,22 @@ void AvgFilter_Int_Init(AvgFilter_Int_t *f, uint16_t N)
 /**
  * @brief  输入一个样本，累积N个样本后输出平均值
  * @param  f    滤波器结构体指针
- * @param  x    输入样本值（int16_t）
+ * @param  x    输入样本值（int32_t）
  * @param  out  输出均值指针（仅当返回1时有效）
  * @return 0    样本未满，继续累积；1 - 输出已准备好
  */
-uint8_t AvgFilter_Int_Put(AvgFilter_Int_t *f, int16_t x, int16_t *out)
+uint8_t AvgFilter_Int_Put(AvgFilter_Int_t *f, int32_t x, int32_t *out)
 {
-    f->sum += x; /* 累加新样本 */
+    f->sum += x; /* 累加新样本（int64_t 防止溢出） */
     if (++f->count < f->N)
         return 0; /* 样本数未达到N，继续累积 */
 
 #ifdef USE_SHIFT_DIV
     /* 位移模式：sum >> shift */
-    *out = (int16_t)(f->sum >> f->shift);
+    *out = (int32_t)(f->sum >> f->shift);
 #else
     /* 直接除法模式：sum / N */
-    *out = (int16_t)(f->sum / f->N);
+    *out = (int32_t)(f->sum / f->N);
 #endif
     
     /* 重置状态 */
@@ -61,71 +61,7 @@ uint8_t AvgFilter_Int_Put(AvgFilter_Int_t *f, int16_t x, int16_t *out)
 }
 
 /*================================================================================================*/
-/* 2. 滑动平均滤波器（整数版本）                                                                  */
-/*================================================================================================*/
-
-/**
- * @brief  初始化滑动平均滤波器（整数版本）
- * @param  f    滤波器结构体指针
- * @param  buf  外部分配的缓冲区指针（存储N个int16_t）
- * @param  N    滑动窗口大小
- * @note   缓冲区由调用者分配和管理，不能释放
- */
-void MovAvgFilter_Int_Init(MovAvgFilter_Int_t *f, int16_t *buf, uint16_t N)
-{
-#ifdef USE_SHIFT_DIV
-    /* 位移模式：检查 N 是否为 2 的幂 */
-    uint8_t shift = calc_log2(N);
-    if (shift == 0)
-    {
-        /* N 不是 2 的幂，默认设置为 16 */
-        N = 16;
-        shift = 4;
-    }
-    f->shift = shift;
-#else
-    /* 直接除法模式：N 可以是任意值 */
-    if (N == 0)
-        N = 1;  /* 防止除零 */
-#endif
-    
-    memset(buf, 0, N * sizeof(int16_t)); /* 清空缓冲区 */
-    f->buf = buf;
-    f->sum = 0;
-    f->N = N;
-    f->index = 0;
-}
-
-/**
- * @brief  输入一个样本，返回N个样本的滑动平均值
- * @param  f 滤波器结构体指针
- * @param  x 输入样本值（int16_t）
- * @return 当前窗口内的平均值（int16_t）
- */
-int16_t MovAvgFilter_Int_Put(MovAvgFilter_Int_t *f, int16_t x)
-{
-    uint16_t idx = f->index;
-    
-    /* 更新窗口和：加入新样本，移除被挤出的旧样本 */
-    f->sum += x - f->buf[idx];
-    f->buf[idx] = x; /* 存储新样本 */
-
-    /* 环形缓冲区索引递进 */
-    if (++idx >= f->N)
-        idx = 0;
-    f->index = idx;
-
-#ifdef USE_SHIFT_DIV
-    /* 位移模式：sum >> shift */
-    return (int16_t)(f->sum >> f->shift);
-#else
-    /* 直接除法模式：sum / N */
-    return (int16_t)(f->sum / f->N);
-#endif
-}
-
-/*================================================================================================*/
-/* 3. 一阶 IIR 低通滤波器（整数版本）                                                             */
+/* 2. 一阶 IIR 低通滤波器（整数版本，支持 int32_t）                                               */
 /*================================================================================================*/
 
 /**
@@ -181,11 +117,11 @@ void IIR1_LPF_Int_Init_Fc(IIR1_LPF_Int_t *f, uint16_t fs, uint16_t fc)
 /**
  * @brief  输入一个样本，返回低通滤波后的值
  * @param  f 滤波器结构体指针
- * @param  x 输入样本值（int16_t）
- * @return 滤波后的输出值（int16_t）
+ * @param  x 输入样本值（int32_t）
+ * @return 滤波后的输出值（int32_t）
  * @note   y = y_prev + alpha * (x - y_prev)
  */
-int16_t IIR1_LPF_Int_Put(IIR1_LPF_Int_t *f, int16_t x)
+int32_t IIR1_LPF_Int_Put(IIR1_LPF_Int_t *f, int32_t x)
 {
     if (f->first_run)
     {
@@ -200,10 +136,14 @@ int16_t IIR1_LPF_Int_Put(IIR1_LPF_Int_t *f, int16_t x)
      *  diff = x - y_prev
      *  delta = (alpha * diff) >> Q15_SHIFT
      *  y = y_prev + delta
+     * 
+     * 注意：需要使用 int64_t 防止中间乘法溢出
+     *  alpha (int16_t) * diff (int32_t) 最大可达 ±70,000,000,000,000
+     *  需要 int64_t 存储
      */
-    int16_t diff = x - f->y_prev;
-    int32_t delta = ((int32_t)f->alpha * (int32_t)diff) >> Q15_SHIFT;
-    int16_t y = f->y_prev + (int16_t)delta;
+    int32_t diff = x - f->y_prev;
+    int64_t delta = ((int64_t)f->alpha * (int64_t)diff) >> Q15_SHIFT;
+    int32_t y = f->y_prev + (int32_t)delta;
     
     f->y_prev = y; /* 保存输出供下次使用 */
     return y;
