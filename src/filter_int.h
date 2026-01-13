@@ -1,6 +1,6 @@
 /**
  * @file    filter_int.h
- * @brief   数字滤波器库 - 包含 5 种常用滤波算法
+ * @brief   整数定点数字滤波器库 - 适用于无 FPU 的单片机
  *
  * 功能模块：
  *  1. AvgFilter_Int     - 简单平均滤波器（整数版本）
@@ -8,7 +8,7 @@
  *  3. IIR1_LPF_Int      - 一阶 IIR 低通滤波器（整数版本）
  *
  * 定点数格式说明：
- *  - Q16:   16.16 定点数，范围 ±32768，精度 1/65536 ≈ 0.000015
+ *  - Q16:    16.16 定点数，范围 ±32768，精度 1/65536 ≈ 0.000015
  *  - Q15: 1.15 定点数，范围 ±1. 0，精度 1/32768 ≈ 0.00003
  *
  * 性能特点：
@@ -28,7 +28,7 @@
 #ifndef FILTER_INT_H_
 #define FILTER_INT_H_
 
-#include <stdint. h>
+#include <stdint.h>
 #include <string.h>
 
 /* ===================== 配置选项 ===================== */
@@ -50,11 +50,11 @@
  * 
  * 使用方法：
  *  在工程中定义宏（推荐在编译选项中添加）：
- *  - Keil:  Options -> C/C++ -> Preprocessor Symbols 添加 USE_SHIFT_DIV
+ *  - Keil:   Options -> C/C++ -> Preprocessor Symbols 添加 USE_SHIFT_DIV
  *  - GCC:   CFLAGS += -DUSE_SHIFT_DIV
  *  - 或在本文件开头定义：#define USE_SHIFT_DIV
  */
-// #define USE_SHIFT_DIV  /* 取消注释以启用位移优化 */
+#define USE_SHIFT_DIV  /* 取消注释以启用位移优化 */
 
 /* ===================== 定点数格式定义 ===================== */
 
@@ -65,7 +65,7 @@
  * - 使用 int32_t 存储
  */
 #define Q16_SHIFT       (16)                    /*!< Q16 格式小数位数 */
-#define Q16_ONE         (1 << Q16_SHIFT)        /*!< Q16 格式的 1.0 = 65536 */
+#define Q16_ONE         (1L << Q16_SHIFT)       /*!< Q16 格式的 1.0 = 65536 */
 #define FLOAT_TO_Q16(x) ((int32_t)((x) * Q16_ONE + ((x) >= 0 ? 0.5f : -0.5f)))
 #define Q16_TO_FLOAT(x) ((float)(x) / Q16_ONE)
 
@@ -76,7 +76,9 @@
  * - 使用 int16_t 存储（节省内存）
  */
 #define Q15_SHIFT       (15)                    /*!< Q15 格式小数位数 */
-#define Q15_ONE         (1 << Q15_SHIFT)        /*!< Q15 格式的 1.0 = 32768 */
+#define Q15_ONE         (32767)                 /*!< Q15 格式的 1.0 = 32767（避免溢出） */
+#define Q15_MAX         (32767)                 /*!< Q15 最大值 */
+#define Q15_MIN         (-32768)                /*!< Q15 最小值 */
 #define FLOAT_TO_Q15(x) ((int16_t)((x) * Q15_ONE + ((x) >= 0 ? 0.5f : -0.5f)))
 #define Q15_TO_FLOAT(x) ((float)(x) / Q15_ONE)
 
@@ -94,7 +96,7 @@ static inline int16_t Q15_MUL(int16_t a, int16_t b)
 #ifdef USE_SHIFT_DIV
 /**
  * @brief  计算整数 N 的 log2 值（仅支持 2 的幂次方）
- * @param  N 输入值（必须是 2 的幂：2, 4, 8, 16, 32, ...  ）
+ * @param  N 输入值（必须是 2 的幂：2, 4, 8, 16, 32, ... ）
  * @return log2(N)，如果 N 不是 2 的幂则返回 0
  * @note   用于确定移位量：avg = sum >> log2(N)
  */
@@ -140,7 +142,7 @@ static inline uint8_t is_power_of_2(uint16_t N)
  * 功能：累积 N 个样本后输出一个平均值，然后重新开始
  * 
  * USE_SHIFT_DIV 模式：
- *  - 约束：N 必须是 2 的幂（2, 4, 8, 16, 32, ... ）
+ *  - 约束：N 必须是 2 的幂（2, 4, 8, 16, 32, ...）
  *  - 优化：sum / N = sum >> log2(N)
  *  - 性能：1 周期
  * 
@@ -160,10 +162,10 @@ static inline uint8_t is_power_of_2(uint16_t N)
 typedef struct
 {
     int32_t sum;      /*!< 累加和（使用 32 位防止溢出） */
-    uint16_t count;   /*! < 已累加次数 */
+    uint16_t count;   /*!< 已累加次数 */
     uint16_t N;       /*!< 窗口大小 */
 #if NEED_SHIFT_PARAM
-    uint8_t shift;    /*! < log2(N)，用于右移代替除法（仅 USE_SHIFT_DIV 模式） */
+    uint8_t shift;    /*!< log2(N)，用于右移代替除法（仅 USE_SHIFT_DIV 模式） */
 #endif
 } AvgFilter_Int_t;
 
@@ -171,7 +173,7 @@ typedef struct
  * @brief  初始化简单平均滤波器（整数版本）
  * @param  f 滤波器结构体指针
  * @param  N 平均窗口大小
- *           - USE_SHIFT_DIV 模式：必须是 2 的幂（2, 4, 8, 16, 32, ...）
+ *           - USE_SHIFT_DIV 模式：必须是 2 的幂（2, 4, 8, 16, 32, ... ）
  *           - 直接除法模式：可以是任意值（1-65535）
  * @note   USE_SHIFT_DIV 模式下，如果 N 不是 2 的幂，会自动调整为 16
  */
@@ -235,7 +237,7 @@ void MovAvgFilter_Int_Init(MovAvgFilter_Int_t *f, int16_t *buf, uint16_t N);
  */
 int16_t MovAvgFilter_Int_Put(MovAvgFilter_Int_t *f, int16_t x);
 
-/* ===================== 3. 一阶 IIR 低��滤波器（整数版本） =====================
+/* ===================== 3. 一阶 IIR 低通滤波器（整数版本） =====================
  *
  * 公式：y = y_prev + alpha * (x - y_prev)
  * 定点实现：使用 Q15 格式表示 alpha（0.0 到 1.0）
@@ -305,12 +307,5 @@ int16_t IIR1_LPF_Int_Put(IIR1_LPF_Int_t *f, int16_t x);
 #define ALPHA_Q15_0_5   (16384)  /*!< 0.5 */
 #define ALPHA_Q15_0_8   (26214)  /*!< 0.8 */
 
-/* ===================== 编译时配置信息输出 ===================== */
-
-#ifdef USE_SHIFT_DIV
-    #pragma message("Filter Mode:  SHIFT DIVISION (Optimized, N must be power of 2)")
-#else
-    #pragma message("Filter Mode:  DIRECT DIVISION (Flexible, N can be any value)")
-#endif
 
 #endif /* FILTER_INT_H_ */

@@ -135,9 +135,9 @@ int16_t MovAvgFilter_Int_Put(MovAvgFilter_Int_t *f, int16_t x)
  */
 void IIR1_LPF_Int_Init(IIR1_LPF_Int_t *f, int16_t alpha)
 {
-    /* 限制 alpha 在有效范围内（0 到 Q15_ONE） */
-    if (alpha > Q15_ONE)
-        alpha = Q15_ONE;
+    /* 限制 alpha 在有效范围内（0 到 Q15_MAX） */
+    if (alpha > Q15_MAX)
+        alpha = Q15_MAX;
     if (alpha < 0)
         alpha = 0;
     
@@ -205,6 +205,6 @@ int16_t IIR1_LPF_Int_Put(IIR1_LPF_Int_t *f, int16_t x)
     int32_t delta = ((int32_t)f->alpha * (int32_t)diff) >> Q15_SHIFT;
     int16_t y = f->y_prev + (int16_t)delta;
     
-    f->y_prev = y; /* 保存输出供下次使��� */
+    f->y_prev = y; /* 保存输出供下次使用 */
     return y;
 }
