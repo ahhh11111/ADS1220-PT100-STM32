@@ -243,7 +243,36 @@ void ADS1220_GetDefaultConfig(ADS1220_Config_t *config);
 ```c
 int32_t ADS1220_ReadData(void);
 int32_t ADS1220_ReadVoltage_Int(uint8_t gain, int32_t vref_unit);
-uint8_t ADS1220_WaitForData(uint32_t timeout_ms);
+uint8_t ADS1220_WaitForData(uint32_t max_try);
+uint8_t ADS1220_WaitForDataTimeout_ms(uint32_t timeout_ms);
+ADS1220_ConvState_t ADS1220_ReadDataWithTimeout(uint32_t timeout_ms, int32_t *data);
+```
+
+#### 非阻塞状态机接口
+
+```c
+void ADS1220_StartConversion(void);                                           // 启动转换
+ADS1220_ConvState_t ADS1220_PollConversion(uint32_t timeout_ms, uint32_t start_time_ms);  // 轮询状态
+```
+
+**状态机使用示例:**
+```c
+// 非阻塞式ADC读取
+uint32_t start_time = GetMillis();
+ADS1220_StartConversion();
+
+while (1) {
+    ADS1220_ConvState_t state = ADS1220_PollConversion(100, start_time);
+    if (state == ADS1220_CONV_READY) {
+        int32_t data = ADS1220_ReadData();
+        // 处理数据...
+        break;
+    } else if (state == ADS1220_CONV_TIMEOUT) {
+        // 超时处理...
+        break;
+    }
+    // 可以在此执行其他任务
+}
 ```
 
 #### 快速配置
