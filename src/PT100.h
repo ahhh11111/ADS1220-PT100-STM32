@@ -22,6 +22,19 @@
  * ==================================================================== */
 
 /**
+ * @brief PT100转换状态枚举（用于非阻塞状态机）
+ * @note  用于非阻塞式测量接口
+ */
+typedef enum
+{
+    PT100_CONV_IDLE = 0,    /**< 空闲状态，未启动转换 */
+    PT100_CONV_WAITING,     /**< 等待ADC数据就绪中 */
+    PT100_CONV_READY,       /**< 数据已就绪，可读取 */
+    PT100_CONV_TIMEOUT,     /**< 等待超时 */
+    PT100_CONV_ERROR        /**< 转换出错 */
+} PT100_ConvState_t;
+
+/**
  * @brief IDAC激励电流选择枚举
  * @note  PT100推荐使用250μA，较大电流会引起自热效应
  */
@@ -135,6 +148,87 @@ int32_t PT100_ResistanceToTemperature_Int(int32_t resistance_mohm, PT100_Type_t 
  * @retval 无
  */
 void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, int32_t *offset_centideg);
+
+/* ====================================================================
+ * 非阻塞式状态机API - 避免死循环等待
+ * 使用方法:
+ *   1. 调用 PT100_StartMeasurement() 启动转换
+ *   2. 记录开始时间 start_time = GetMillis()
+ *   3. 在主循环中调用 PT100_PollResistance() 或 PT100_PollTemperature()
+ *   4. 返回 PT100_CONV_READY 时，结果已存入输出参数
+ * ==================================================================== */
+
+/**
+ * @brief  启动PT100测量（非阻塞）
+ * @param  无
+ * @retval 无
+ * @note   调用后需要使用 PT100_PollResistance 或 PT100_PollTemperature 轮询转换状态
+ */
+void PT100_StartMeasurement(void);
+
+/**
+ * @brief  轮询PT100电阻测量结果（非阻塞）
+ * @param  config: PT100配置参数指针
+ * @param  timeout_ms: 超时时间(毫秒)
+ * @param  start_time_ms: 转换开始时的时间戳(毫秒)，由 GetMillis() 获取
+ * @param  resistance_mohm: 输出参数，电阻值(mΩ)，仅在返回 PT100_CONV_READY 时有效
+ * @retval PT100_CONV_WAITING - 仍在等待ADC数据
+ * @retval PT100_CONV_READY - 数据已就绪，resistance_mohm 已填充
+ * @retval PT100_CONV_TIMEOUT - 等待超时
+ * @retval PT100_CONV_ERROR - 参数错误或计算错误
+ * 
+ * @note   使用示例:
+ * @code
+ *         PT100_StartMeasurement();
+ *         uint32_t start = GetMillis();
+ *         while (1) {
+ *             int32_t resistance;
+ *             PT100_ConvState_t state = PT100_PollResistance(&config, 100, start, &resistance);
+ *             if (state == PT100_CONV_READY) {
+ *                 // 使用 resistance 值
+ *                 break;
+ *             } else if (state == PT100_CONV_TIMEOUT) {
+ *                 // 超时处理
+ *                 break;
+ *             }
+ *             // 可在此执行其他任务
+ *         }
+ * @endcode
+ */
+PT100_ConvState_t PT100_PollResistance(PT100_Config_t *config, uint32_t timeout_ms, 
+                                        uint32_t start_time_ms, int32_t *resistance_mohm);
+
+/**
+ * @brief  轮询PT100温度测量结果（非阻塞）
+ * @param  config: PT100配置参数指针
+ * @param  timeout_ms: 超时时间(毫秒)
+ * @param  start_time_ms: 转换开始时的时间戳(毫秒)，由 GetMillis() 获取
+ * @param  temperature_centideg: 输出参数，温度值(0.01°C)，仅在返回 PT100_CONV_READY 时有效
+ * @retval PT100_CONV_WAITING - 仍在等待ADC数据
+ * @retval PT100_CONV_READY - 数据已就绪，temperature_centideg 已填充
+ * @retval PT100_CONV_TIMEOUT - 等待超时
+ * @retval PT100_CONV_ERROR - 参数错误或计算错误
+ * 
+ * @note   使用示例:
+ * @code
+ *         PT100_StartMeasurement();
+ *         uint32_t start = GetMillis();
+ *         while (1) {
+ *             int32_t temperature;
+ *             PT100_ConvState_t state = PT100_PollTemperature(&config, 100, start, &temperature);
+ *             if (state == PT100_CONV_READY) {
+ *                 // 使用 temperature 值 (单位: 0.01°C)
+ *                 break;
+ *             } else if (state == PT100_CONV_TIMEOUT) {
+ *                 // 超时处理
+ *                 break;
+ *             }
+ *             // 可在此执行其他任务
+ *         }
+ * @endcode
+ */
+PT100_ConvState_t PT100_PollTemperature(PT100_Config_t *config, uint32_t timeout_ms, 
+                                         uint32_t start_time_ms, int32_t *temperature_centideg);
 
 /**
  * @brief 便捷宏定义 - 提供简短的API名称

@@ -294,6 +294,38 @@ int32_t PT100_ResistanceToTemperature_Int(int32_t resistance_mohm, PT100_Type_t 
 void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, int32_t *offset_centideg);
 ```
 
+#### PT100 非阻塞状态机接口
+
+```c
+void PT100_StartMeasurement(void);                                           // 启动测量
+PT100_ConvState_t PT100_PollResistance(PT100_Config_t *config, uint32_t timeout_ms, 
+                                        uint32_t start_time_ms, int32_t *resistance_mohm);  // 轮询电阻
+PT100_ConvState_t PT100_PollTemperature(PT100_Config_t *config, uint32_t timeout_ms, 
+                                         uint32_t start_time_ms, int32_t *temperature_centideg);  // 轮询温度
+```
+
+**非阻塞状态机使用示例:**
+```c
+// 非阻塞式PT100温度读取
+PT100_StartMeasurement();
+uint32_t start_time = GetMillis();
+
+while (1) {
+    int32_t temperature;
+    PT100_ConvState_t state = PT100_PollTemperature(&config, 100, start_time, &temperature);
+    
+    if (state == PT100_CONV_READY) {
+        // temperature 单位: 0.01°C
+        printf("Temperature: %ld.%02ld°C\n", temperature / 100, temperature % 100);
+        break;
+    } else if (state == PT100_CONV_TIMEOUT) {
+        printf("Measurement timeout!\n");
+        break;
+    }
+    // 可以在此执行其他任务，CPU不会被阻塞
+}
+```
+
 **单位说明:**
 - 电阻: mΩ（毫欧姆），例如 100000mΩ = 100Ω
 - 温度: 0.01°C（百分之一摄氏度），例如 2500 = 25.00°C

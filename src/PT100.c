@@ -384,6 +384,153 @@ void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, in
 }
 
 /* ====================================================================
+ * 非阻塞式状态机API实现
+ * ==================================================================== */
+
+/**
+ * @brief  启动PT100测量（非阻塞）
+ * @note   调用后需要使用 PT100_PollResistance 或 PT100_PollTemperature 轮询转换状态
+ */
+void PT100_StartMeasurement(void)
+{
+    ADS1220_StartConversion();
+}
+
+/**
+ * @brief  从ADC原始值计算电阻（绝对测量法）
+ * @param  config: PT100配置参数指针
+ * @param  raw: ADC原始值
+ * @retval 电阻值(mΩ)，失败返回-1
+ */
+static int32_t PT100_CalcResistance_Absolute(PT100_Config_t *config, int32_t raw)
+{
+    /* 获取IDAC电流(μA) */
+    uint16_t current_ua = PT100_GetIDACCurrent(config->idac);
+    if (current_ua == 0)
+        return -1;
+
+    /* 计算电阻: R(mΩ) = V / I
+     * 使用64位中间变量避免溢出
+     */
+    int64_t numerator = (int64_t)raw * (int64_t)config->vref_mv * 1000000LL;
+    int64_t denominator = 8388608LL * (int64_t)config->gain * (int64_t)current_ua;
+
+    return (int32_t)(numerator / denominator);
+}
+
+/**
+ * @brief  从ADC原始值计算电阻（3线制硬件比例测量法）
+ * @param  config: PT100配置参数指针
+ * @param  raw: ADC原始值
+ * @retval 电阻值(mΩ)，失败返回-1
+ */
+static int32_t PT100_CalcResistance_3Wire_Ratiometric(PT100_Config_t *config, int32_t raw)
+{
+    /* 检查参考电阻值是否有效 */
+    if (config->rref_mohm == 0)
+        return -1;
+
+    /* 修正：3线制下，流过Rref的电流是流过PT100电流的2倍 (IDAC1 + IDAC2) */
+    int64_t numerator = (int64_t)raw * (int64_t)config->rref_mohm;
+
+    /* 如果是3线制，分子需要乘以2 */
+    if (config->wire_mode == PT100_3WIRE_RATIOMETRIC)
+    {
+        numerator *= 2;
+    }
+
+    int64_t denominator = 8388608LL * (int64_t)config->gain;
+
+    return (int32_t)(numerator / denominator);
+}
+
+/**
+ * @brief  轮询PT100电阻测量结果（非阻塞）
+ * @param  config: PT100配置参数指针
+ * @param  timeout_ms: 超时时间(毫秒)
+ * @param  start_time_ms: 转换开始时的时间戳(毫秒)
+ * @param  resistance_mohm: 输出参数，电阻值(mΩ)
+ * @retval PT100_CONV_WAITING/READY/TIMEOUT/ERROR
+ */
+PT100_ConvState_t PT100_PollResistance(PT100_Config_t *config, uint32_t timeout_ms, 
+                                        uint32_t start_time_ms, int32_t *resistance_mohm)
+{
+    /* 检查输入参数 */
+    if (config == (void *)0 || resistance_mohm == (void *)0)
+    {
+        return PT100_CONV_ERROR;
+    }
+
+    /* 轮询ADS1220转换状态 */
+    ADS1220_ConvState_t ads_state = ADS1220_PollConversion(timeout_ms, start_time_ms);
+
+    switch (ads_state)
+    {
+    case ADS1220_CONV_WAITING:
+        return PT100_CONV_WAITING;
+
+    case ADS1220_CONV_TIMEOUT:
+        return PT100_CONV_TIMEOUT;
+
+    case ADS1220_CONV_READY:
+        {
+            /* 数据就绪，读取并计算电阻 */
+            int32_t raw = ADS1220_ReadData();
+
+            int32_t resistance;
+            if (config->wire_mode == PT100_3WIRE_RATIOMETRIC)
+            {
+                resistance = PT100_CalcResistance_3Wire_Ratiometric(config, raw);
+            }
+            else
+            {
+                resistance = PT100_CalcResistance_Absolute(config, raw);
+            }
+
+            if (resistance < 0)
+            {
+                return PT100_CONV_ERROR;
+            }
+
+            *resistance_mohm = resistance;
+            return PT100_CONV_READY;
+        }
+
+    default:
+        return PT100_CONV_ERROR;
+    }
+}
+
+/**
+ * @brief  轮询PT100温度测量结果（非阻塞）
+ * @param  config: PT100配置参数指针
+ * @param  timeout_ms: 超时时间(毫秒)
+ * @param  start_time_ms: 转换开始时的时间戳(毫秒)
+ * @param  temperature_centideg: 输出参数，温度值(0.01°C)
+ * @retval PT100_CONV_WAITING/READY/TIMEOUT/ERROR
+ */
+PT100_ConvState_t PT100_PollTemperature(PT100_Config_t *config, uint32_t timeout_ms, 
+                                         uint32_t start_time_ms, int32_t *temperature_centideg)
+{
+    /* 检查输入参数 */
+    if (config == (void *)0 || temperature_centideg == (void *)0)
+    {
+        return PT100_CONV_ERROR;
+    }
+
+    int32_t resistance;
+    PT100_ConvState_t state = PT100_PollResistance(config, timeout_ms, start_time_ms, &resistance);
+
+    if (state == PT100_CONV_READY)
+    {
+        /* 电阻值有效，转换为温度 */
+        *temperature_centideg = PT100_ResistanceToTemperature_Int(resistance, config->type);
+    }
+
+    return state;
+}
+
+/* ====================================================================
  * 公共API函数实现
  * ==================================================================== */
 
