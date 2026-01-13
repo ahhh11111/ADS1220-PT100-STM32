@@ -189,18 +189,19 @@ static uint16_t PT100_GetIDACCurrent(uint8_t idac_setting)
 /**
  * @brief  读取ADC原始值(内部辅助函数)
  * @retval ADC原始值，失败返回0x7FFFFFFF
+ * @note   使用基于超时的等待机制，避免死等
  */
 static int32_t PT100_ReadADCRaw(void)
 {
-    ADS1220_ClearError();
-    ADS1220_StartSync();
-
-    // 等待数据就绪 (20SPS约50ms，给予充足的超时时间)
-    if (!ADS1220_WaitForData(10000000))
+    int32_t data;
+    
+    /* 使用带超时的读取函数，100ms超时足够覆盖各种采样率 */
+    /* 1000SPS约1ms，20SPS约50ms，给予充足的超时时间 */
+    if (ADS1220_ReadDataWithTimeout(100, &data) == ADS1220_CONV_READY)
     {
-        return 0x7FFFFFFF;
+        return data;
     }
-    return ADS1220_ReadData();
+    return 0x7FFFFFFF;
 }
 
 /* ====================================================================

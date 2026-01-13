@@ -26,6 +26,21 @@
 #define ADS1220_ERROR_INVALID -2 /**< 无效参数 */
 
 /* ====================================================================
+ * 转换状态枚举（用于状态机/非阻塞模式）
+ * ==================================================================== */
+/**
+ * @brief ADC转换状态枚举
+ * @note  用于非阻塞式状态机轮询
+ */
+typedef enum {
+    ADS1220_CONV_IDLE = 0,      /**< 空闲状态，未启动转换 */
+    ADS1220_CONV_WAITING,       /**< 等待数据就绪中 */
+    ADS1220_CONV_READY,         /**< 数据已就绪，可读取 */
+    ADS1220_CONV_TIMEOUT,       /**< 等待超时 */
+    ADS1220_CONV_ERROR          /**< 转换出错 */
+} ADS1220_ConvState_t;
+
+/* ====================================================================
  * SPI 模式选择
  * 说明：默认使用硬件SPI(推荐)，取消注释下一行可切换到软件SPI
  * ==================================================================== */
@@ -322,11 +337,55 @@ int32_t ADS1220_ReadData(void);
 uint8_t ADS1220_IsDataReady(void);
 
 /**
- * @brief  等待数据就绪
+ * @brief  等待数据就绪（基于轮询次数，保留兼容性）
+ * @param  max_try: 最大轮询次数
+ * @retval 1=数据就绪, 0=超时
+ * @note   此函数为阻塞式轮询，建议使用 ADS1220_WaitForDataTimeout_ms 或状态机方式
+ */
+uint8_t ADS1220_WaitForData(uint32_t max_try);
+
+/**
+ * @brief  等待数据就绪（基于超时时间）
  * @param  timeout_ms: 超时时间(毫秒)
  * @retval 1=数据就绪, 0=超时
+ * @note   此函数为阻塞式等待，使用精确的毫秒超时
  */
-uint8_t ADS1220_WaitForData(uint32_t timeout_ms);
+uint8_t ADS1220_WaitForDataTimeout_ms(uint32_t timeout_ms);
+
+/* 非阻塞式状态机接口 */
+/**
+ * @brief  启动ADC转换（非阻塞）
+ * @note   调用后需要使用 ADS1220_PollConversion 轮询转换状态
+ * @param  无
+ * @retval 无
+ */
+void ADS1220_StartConversion(void);
+
+/**
+ * @brief  轮询ADC转换状态（非阻塞）
+ * @param  timeout_ms: 超时时间(毫秒)，从 ADS1220_StartConversion 调用开始计算
+ * @param  start_time_ms: 转换开始时的时间戳(毫秒)，由 GetMillis() 获取
+ * @retval ADS1220_CONV_WAITING - 仍在等待数据
+ * @retval ADS1220_CONV_READY - 数据已就绪
+ * @retval ADS1220_CONV_TIMEOUT - 等待超时
+ * @note   状态机模式使用示例:
+ *         1. 调用 ADS1220_StartConversion() 启动转换
+ *         2. 记录 start_time = GetMillis()
+ *         3. 在主循环中调用 ADS1220_PollConversion(timeout_ms, start_time)
+ *         4. 当返回 ADS1220_CONV_READY 时，调用 ADS1220_ReadData() 读取数据
+ */
+ADS1220_ConvState_t ADS1220_PollConversion(uint32_t timeout_ms, uint32_t start_time_ms);
+
+/**
+ * @brief  读取ADC数据（带超时的完整流程）
+ * @param  timeout_ms: 超时时间(毫秒)
+ * @param  data: 输出参数，存储读取的ADC数据（不能为NULL）
+ * @retval ADS1220_CONV_READY - 读取成功
+ * @retval ADS1220_CONV_TIMEOUT - 等待超时
+ * @retval ADS1220_CONV_ERROR - 参数错误（data为NULL）
+ * @note   此函数封装了 StartSync + WaitForData + ReadData 的完整流程
+ */
+ADS1220_ConvState_t ADS1220_ReadDataWithTimeout(uint32_t timeout_ms, int32_t *data);
 
 /**
  * @brief  读取电压值
