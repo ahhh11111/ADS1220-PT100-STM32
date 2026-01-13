@@ -264,17 +264,18 @@ static int32_t PT100_ReadResistance_3Wire_Ratiometric(PT100_Config_t *config)
     if (config->rref_mohm == 0)
         return -1;
 
-    /* 比例测量计算:
-     *
-     * ADC输入电压 = I × Rpt100 (经过PGA放大)
-     * 参考电压 = I × Rref (不经过PGA)
-     *
-     * ADC_code / 2^23 = (I × Rpt100 × Gain) / (I × Rref)
-     *
-     * 因此: Rpt100(mΩ) = (ADC_code × Rref(mΩ)) / (2^23 × Gain)
+    /* * 修正：3线制下，流过Rref的电流是流过PT100电流的2倍 (IDAC1 + IDAC2)
+     * 公式: Rpt100 = (ADC_code * 2 * Rref) / (2^23 * Gain)
      */
     int64_t numerator = (int64_t)raw * (int64_t)config->rref_mohm;
-    int64_t denominator = 8388608LL * (int64_t)config->gain; /* 2^23 × Gain */
+
+    // 如果是3线制，分子需要乘以2
+    if (config->wire_mode == PT100_3WIRE_RATIOMETRIC)
+    {
+        numerator *= 2;
+    }
+
+    int64_t denominator = 8388608LL * (int64_t)config->gain;
 
     return (int32_t)(numerator / denominator);
 }
@@ -455,7 +456,7 @@ void PT100_Init(PT100_Config_t *config)
      *  - Single-shot：单次转换（由 START 或命令触发）
      *  - 禁用内部温度传感器
      * ===================================================================== */
-    ads.reg1 = ADS1220_DR_20SPS |    /* 数据速率 20SPS */
+    ads.reg1 = ADS1220_DR_1000SPS |  /* 数据速率 1000SPS */
                ADS1220_MODE_NORMAL | /* 正常工作模式 */
                ADS1220_CM_SINGLE |   /* 单次转换模式 */
                ADS1220_TS_DISABLED;  /* 关闭内部温度传感器 */
@@ -468,9 +469,9 @@ void PT100_Init(PT100_Config_t *config)
      *  - fir_mode : FIR 滤波类型
      *  - idac     : IDAC 电流档位
      * ===================================================================== */
-    ads.reg2 = config->vref_sel |     /* 参考源选择 */
-               config->fir_mode |     /* 数字滤波配置 */
-               (config->idac & 0x07); /* IDAC 电流档位 */
+    ads.reg2 = config->vref_sel |      /* 参考源选择 */
+               ADS1220_FIR_50HZ_60HZ | /* 数字滤波配置 */
+               (config->idac & 0x07);  /* IDAC 电流档位 */
 
     /* =====================================================================
      * 5. Reg3：IDAC 电流源路由

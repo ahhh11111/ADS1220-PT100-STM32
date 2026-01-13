@@ -71,9 +71,8 @@ typedef struct
     uint8_t idac1_pin;         /**< IDAC1 路由引脚 */
     uint8_t idac2_pin;         /**< IDAC2 路由引脚（不用则 DISABLED） */
 
-    /* -------- 参考与滤波（完全显式） -------- */
+    /* -------- 参考 -------- */
     uint8_t vref_sel; /**< ADS1220_VREF_INT / ADS1220_VREF_EXT_REF0 */
-    uint8_t fir_mode; /**< ADS1220_FIR_xxx */
 
     /* -------- 参考配置 -------- */
     uint16_t vref_mv;   /**< 绝对测量用 */
