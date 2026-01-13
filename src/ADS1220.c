@@ -463,15 +463,6 @@ uint8_t ADS1220_WaitForDataTimeout_ms(uint32_t timeout_ms)
 }
 
 /**
- * @brief  启动ADC转换（非阻塞）
- * @note   调用后需要使用 ADS1220_PollConversion 轮询转换状态
- */
-void ADS1220_StartConversion(void)
-{
-    ADS1220_StartSync();
-}
-
-/**
  * @brief  轮询ADC转换状态（非阻塞）
  * @param  timeout_ms: 超时时间(毫秒)
  * @param  start_time_ms: 转换开始时的时间戳(毫秒)

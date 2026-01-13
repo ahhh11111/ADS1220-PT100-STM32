@@ -415,7 +415,7 @@ void PT100_Calibrate_Int(PT100_Config_t *config, int32_t known_temp_centideg, in
  */
 void PT100_StartMeasurement(void)
 {
-    ADS1220_StartConversion();
+    ADS1220_StartSync();
 }
 
 /**
