@@ -264,5 +264,36 @@ int32_t IIR1_LPF_Int_Put(IIR1_LPF_Int_t *f, int32_t x);
 #define ALPHA_Q15_0_5   (16384)  /*!< 0.5 */
 #define ALPHA_Q15_0_8   (26214)  /*!< 0.8 */
 
+/* ===================== 3. 去极值平均滤波器（整数版本） ===================== */
+
+typedef struct
+{
+    int32_t *pBuffer;   /*!< 数据缓存指针 */
+    uint16_t N;         /*!< 窗口大小 */
+    uint16_t remove;    /*!< 单侧去除个数 */
+    uint16_t count;     /*!< 当前计数 */
+    
+#ifdef USE_SHIFT_DIV
+    uint8_t shift;      /*!< log2(valid_count)，用于位移优化 */
+#endif
+
+} TrimFilter_Int_t;
+
+/**
+ * @brief  初始化去极值滤波器
+ * @param  f        滤波器结构体指针
+ * @param  pBuffer  外部定义的缓存数组（长度必须 >= N）
+ * @param  N        采样窗口大小
+ * @param  remove   单侧去除的极值个数
+ * @note   如果启用了 USE_SHIFT_DIV，函数会自动微调 remove 的值，
+ * 以确保 (N - 2*remove) 是 2 的幂。
+ */
+void TrimFilter_Int_Init(TrimFilter_Int_t *f, int32_t *pBuffer, uint16_t N, uint16_t remove);
+
+/**
+ * @brief  输入样本，积攒 N 个后排序并去极值平均
+ */
+uint8_t TrimFilter_Int_Put(TrimFilter_Int_t *f, int32_t x, int32_t *out);
+
 
 #endif /* FILTER_INT_H_ */

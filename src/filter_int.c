@@ -148,3 +148,128 @@ int32_t IIR1_LPF_Int_Put(IIR1_LPF_Int_t *f, int32_t x)
     f->y_prev = y; /* 保存输出供下次使用 */
     return y;
 }
+
+/*================================================================================================*/
+/* 3. 去极值平均滤波器（整数版本）                                                                */
+/*================================================================================================*/
+
+/* 冒泡排序保持不变 */
+static void _int_sort(int32_t *arr, uint16_t len)
+{
+    uint16_t i, j;
+    int32_t temp;
+    for (i = 0; i < len - 1; i++)
+    {
+        for (j = 0; j < len - 1 - i; j++)
+        {
+            if (arr[j] > arr[j + 1])
+            {
+                temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+        }
+    }
+}
+
+/**
+ * @brief  初始化去极值滤波器
+ * @param  f        滤波器结构体指针
+ * @param  pBuffer  外部定义的缓存数组
+ * @param  N        采样窗口大小
+ * @param  remove   单侧去除的极值个数
+ */
+void TrimFilter_Int_Init(TrimFilter_Int_t *f, int32_t *pBuffer, uint16_t N, uint16_t remove)
+{
+    /* 1. 基本安全检查 */
+    if (N == 0) N = 1;
+    if (remove * 2 >= N)
+    {
+        remove = (N - 1) / 2; /* 至少保留 1 个数据 */
+    }
+
+    f->pBuffer = pBuffer;
+    f->N = N;
+    f->count = 0;
+
+#ifdef USE_SHIFT_DIV
+    /* * 位移模式优化逻辑：
+     * 有效数据量 valid_count = N - 2 * remove
+     * 这个 valid_count 必须是 2 的幂。
+     * 如果不是，我们增加 remove 的数量，直到 valid_count 变成 2 的幂。
+     */
+    uint16_t valid_count = N - (remove * 2);
+
+    /* 循环检查：如果不是2的幂，且还有数据可减，则增加去除量 */
+    while ((!is_power_of_2(valid_count)) && (valid_count > 1))
+    {
+        remove++;          /* 多去掉一组极值 */
+        valid_count -= 2;  /* 有效数据减少2个 */
+    }
+
+    /* 防止减过头（例如 N=10, remove原本是4，valid=2。如果再减变成0） */
+    if (valid_count == 0)
+    {
+        /* 极端情况回退：不去除任何极值，强制 N 为 2 的幂 */
+        /* 注意：这里为了不改写用户 N，通常建议用户一开始就设计好 */
+        remove = 0; 
+        valid_count = N; 
+        /* 如果 N 也不是 2 的幂，计算 log2 会返回 0，除法变为 >>0 (除以1)，虽然不准但不会死机 */
+    }
+
+    f->remove = remove;
+    f->shift = calc_log2(valid_count);
+#else
+    /* 普通除法模式：直接使用用户参数 */
+    f->remove = remove;
+#endif
+}
+
+/**
+ * @brief  输入样本，积攒 N 个后排序并去极值平均
+ * @return 0 - 正在积攒；1 - 计算完成
+ */
+uint8_t TrimFilter_Int_Put(TrimFilter_Int_t *f, int32_t x, int32_t *out)
+{
+    /* 1. 存入缓冲区 */
+    if (f->count < f->N)
+    {
+        f->pBuffer[f->count] = x;
+        f->count++;
+    }
+
+    /* 2. 检查是否存满 */
+    if (f->count < f->N)
+    {
+        return 0; 
+    }
+
+    /* 3. 数据已满，开始处理 */
+    _int_sort(f->pBuffer, f->N);
+
+    /* 4. 求中间部分和 */
+    int64_t sum = 0;
+    uint16_t start_idx = f->remove;
+    uint16_t end_idx = f->N - f->remove;
+    uint16_t i;
+
+    for (i = start_idx; i < end_idx; i++)
+    {
+        sum += f->pBuffer[i];
+    }
+
+    /* 5. 计算平均值（区分模式） */
+#ifdef USE_SHIFT_DIV
+    /* 位移模式：使用移位代替除法 */
+    *out = (int32_t)(sum >> f->shift);
+#else
+    /* 除法模式：标准除法 */
+    uint16_t valid_count = f->N - (f->remove * 2);
+    if (valid_count == 0) valid_count = 1; // 防除零
+    *out = (int32_t)(sum / valid_count);
+#endif
+
+    /* 6. 重置计数 */
+    f->count = 0;
+    return 1;
+}
