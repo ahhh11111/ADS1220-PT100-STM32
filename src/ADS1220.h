@@ -379,9 +379,10 @@ ADS1220_ConvState_t ADS1220_PollConversion(uint32_t timeout_ms, uint32_t start_t
 /**
  * @brief  读取ADC数据（带超时的完整流程）
  * @param  timeout_ms: 超时时间(毫秒)
- * @param  data: 输出参数，存储读取的ADC数据
+ * @param  data: 输出参数，存储读取的ADC数据（不能为NULL）
  * @retval ADS1220_CONV_READY - 读取成功
  * @retval ADS1220_CONV_TIMEOUT - 等待超时
+ * @retval ADS1220_CONV_ERROR - 参数错误（data为NULL）
  * @note   此函数封装了 StartSync + WaitForData + ReadData 的完整流程
  */
 ADS1220_ConvState_t ADS1220_ReadDataWithTimeout(uint32_t timeout_ms, int32_t *data);

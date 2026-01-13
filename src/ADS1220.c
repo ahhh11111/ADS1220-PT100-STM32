@@ -438,12 +438,15 @@ uint8_t ADS1220_WaitForData(uint32_t max_try)
  * @param  timeout_ms: 超时时间(毫秒)
  * @retval 1=数据就绪, 0=超时
  * @note   使用 GetMillis() 实现精确的毫秒级超时
+ *         无符号整数减法可正确处理计时器溢出（wraparound safe）
  */
 uint8_t ADS1220_WaitForDataTimeout_ms(uint32_t timeout_ms)
 {
 #if defined(ADS1220_DELAY_SYSTICK)
     uint32_t start_time = GetMillis();
     
+    /* 无符号整数减法可正确处理32位计时器溢出 */
+    /* 例如: current=5, start=0xFFFFFFFE, (5 - 0xFFFFFFFE) = 7 (正确) */
     while ((GetMillis() - start_time) < timeout_ms)
     {
         if (ADS1220_IsDataReady())
@@ -475,10 +478,12 @@ void ADS1220_StartConversion(void)
  * @retval ADS1220_CONV_WAITING - 仍在等待数据
  * @retval ADS1220_CONV_READY - 数据已就绪
  * @retval ADS1220_CONV_TIMEOUT - 等待超时
+ * @note   无符号整数减法可正确处理计时器溢出（wraparound safe）
  */
 ADS1220_ConvState_t ADS1220_PollConversion(uint32_t timeout_ms, uint32_t start_time_ms)
 {
 #if defined(ADS1220_DELAY_SYSTICK)
+    /* 无符号整数减法可正确处理32位计时器溢出 */
     /* 检查是否超时 */
     if ((GetMillis() - start_time_ms) >= timeout_ms)
     {
@@ -509,9 +514,17 @@ ADS1220_ConvState_t ADS1220_PollConversion(uint32_t timeout_ms, uint32_t start_t
  * @param  data: 输出参数，存储读取的ADC数据
  * @retval ADS1220_CONV_READY - 读取成功
  * @retval ADS1220_CONV_TIMEOUT - 等待超时
+ * @retval ADS1220_CONV_ERROR - 参数错误
  */
 ADS1220_ConvState_t ADS1220_ReadDataWithTimeout(uint32_t timeout_ms, int32_t *data)
 {
+    /* 检查输入参数 */
+    if (data == (void *)0)
+    {
+        g_last_error = ADS1220_ERROR_INVALID;
+        return ADS1220_CONV_ERROR;
+    }
+    
     ADS1220_ClearError();
     ADS1220_StartSync();
     
