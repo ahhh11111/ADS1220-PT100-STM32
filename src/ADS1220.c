@@ -22,6 +22,9 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data); /**< SPI字节传输 */
 static void ADS1220_CS_Low(void);                      /**< 片选拉低 */
 static void ADS1220_CS_High(void);                     /**< 片选拉高 */
 
+static void ADS1220_Delay_us(uint32_t us); /**< 微秒级延时 */
+static void ADS1220_Delay_ms(uint32_t ms); /**< 毫秒级延时 */
+
 /* ====================================================================
  * 私有变量
  * ==================================================================== */
@@ -108,26 +111,26 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
 
     for (i = 0; i < 8; i++)
     {
-        /* 1. 准备MOSI数据 
+        /* 1. 准备MOSI数据
          * 虽然Mode 1是在Rising Edge Shift，但这里在Rising之前准备好数据
          * 可以保证更充裕的Setup时间，对Slave来说是完全合法的。
          */
         ADS1220_MOSI_Write(data & 0x80);
         data <<= 1;
-        Delay_us(1);
+        ADS1220_Delay_us(1);
 
         /* 2. SCK上升沿 (Leading Edge)
          * Slave在此边沿输出MISO数据
          */
         ADS1220_SCK_High();
-        Delay_us(1);
+        ADS1220_Delay_us(1);
 
         /* 3. SCK下降沿 (Trailing Edge)
          * 这是SPI Mode 1的采样时刻
          * Slave在此边沿采样MOSI
          */
         ADS1220_SCK_Low();
-        
+
         /* 4. 主机采样MISO数据
          * 在SCK拉低后立即读取，模拟在下降沿采样
          * 此时数据在下一个上升沿之前都是有效的
@@ -135,8 +138,8 @@ static uint8_t ADS1220_SPI_TransferByte(uint8_t data)
         recv <<= 1;
         if (ADS1220_MISO_Read())
             recv |= 0x01;
-            
-        Delay_us(1);
+
+        ADS1220_Delay_us(1);
     }
 
     return recv;
@@ -292,7 +295,7 @@ void ADS1220_Init(void)
 #endif
     ADS1220_GPIO_Init(); // 初始化GPIO
     ADS1220_SPI_Init();  // 初始化SPI
-    Delay_ms(10);        // 等待芯片上电稳定
+    ADS1220_Delay_ms(10);        // 等待芯片上电稳定
     ADS1220_Reset();     // 复位芯片
 }
 
@@ -313,9 +316,9 @@ void ADS1220_DeInit(void)
 void ADS1220_SendCommand(uint8_t cmd)
 {
     ADS1220_CS_Low();
-    Delay_us(2);
+    ADS1220_Delay_us(2);
     ADS1220_SPI_TransferByte(cmd);
-    Delay_us(2);
+    ADS1220_Delay_us(2);
     ADS1220_CS_High();
 }
 
@@ -325,7 +328,7 @@ void ADS1220_SendCommand(uint8_t cmd)
 void ADS1220_Reset(void)
 {
     ADS1220_SendCommand(ADS1220_CMD_RESET);
-    Delay_ms(2); // 数据手册建议等待至少50us，这里保守等待2ms
+    ADS1220_Delay_ms(2); // 数据手册建议等待至少50us，这里保守等待2ms
 }
 
 /**
@@ -356,10 +359,10 @@ void ADS1220_WriteRegister(uint8_t reg, uint8_t value)
     uint8_t cmd = ADS1220_CMD_WREG | (reg << 2);
 
     ADS1220_CS_Low();
-    Delay_us(2);
+    ADS1220_Delay_us(2);
     ADS1220_SPI_TransferByte(cmd);
     ADS1220_SPI_TransferByte(value);
-    Delay_us(2);
+    ADS1220_Delay_us(2);
     ADS1220_CS_High();
 }
 
@@ -376,10 +379,10 @@ uint8_t ADS1220_ReadRegister(uint8_t reg)
     uint8_t value;
 
     ADS1220_CS_Low();
-    Delay_us(2);
+    ADS1220_Delay_us(2);
     ADS1220_SPI_TransferByte(cmd);
     value = ADS1220_SPI_TransferByte(0xFF); // 发送dummy byte读取数据
-    Delay_us(2);
+    ADS1220_Delay_us(2);
     ADS1220_CS_High();
 
     return value;
@@ -444,7 +447,7 @@ uint8_t ADS1220_WaitForDataTimeout_ms(uint32_t timeout_ms)
 {
 #if defined(ADS1220_DELAY_SYSTICK)
     uint32_t start_time = GetMillis();
-    
+
     /* 无符号整数减法可正确处理32位计时器溢出 */
     /* 例如: current=5, start=0xFFFFFFFE, (5 - 0xFFFFFFFE) = 7 (正确) */
     while ((GetMillis() - start_time) < timeout_ms)
@@ -481,13 +484,13 @@ ADS1220_ConvState_t ADS1220_PollConversion(uint32_t timeout_ms, uint32_t start_t
         g_last_error = ADS1220_ERROR_TIMEOUT;
         return ADS1220_CONV_TIMEOUT;
     }
-    
+
     /* 检查数据是否就绪 */
     if (ADS1220_IsDataReady())
     {
         return ADS1220_CONV_READY;
     }
-    
+
     return ADS1220_CONV_WAITING;
 #else
     /* 无 SysTick 时，仅检查数据是否就绪 */
@@ -515,21 +518,20 @@ ADS1220_ConvState_t ADS1220_ReadDataWithTimeout(uint32_t timeout_ms, int32_t *da
         g_last_error = ADS1220_ERROR_INVALID;
         return ADS1220_CONV_ERROR;
     }
-    
+
     ADS1220_ClearError();
     ADS1220_StartSync();
-    
+
     if (ADS1220_WaitForDataTimeout_ms(timeout_ms))
     {
         *data = ADS1220_ReadData();
         return ADS1220_CONV_READY;
     }
-    
+
     g_last_error = ADS1220_ERROR_TIMEOUT;
     *data = 0x7FFFFFFF;
     return ADS1220_CONV_TIMEOUT;
 }
-
 
 /**
  * @brief  读取24位ADC原始数据
@@ -542,7 +544,7 @@ int32_t ADS1220_ReadData(void)
     uint8_t buf[3];
 
     ADS1220_CS_Low();
-    Delay_us(2);
+    ADS1220_Delay_us(2);
 
     /* 发送读数据命令并接收3字节数据 */
     ADS1220_SPI_TransferByte(ADS1220_CMD_RDATA);
@@ -550,7 +552,7 @@ int32_t ADS1220_ReadData(void)
     buf[1] = ADS1220_SPI_TransferByte(0xFF); // 中间字节
     buf[2] = ADS1220_SPI_TransferByte(0xFF); // LSB
 
-    Delay_us(2);
+    ADS1220_Delay_us(2);
     ADS1220_CS_High();
 
     /* 组合成24位数据 */
@@ -586,10 +588,10 @@ float ADS1220_ReadVoltage_Float(uint8_t gain, float vref)
  * @retval 电压值(与vref_unit相同单位)
  * @note   转换公式: V = (ADC_Code * Vref) / (2^23 * Gain)
  *         使用整数运算，避免浮点计算
- *         
- * 使用示例: 
+ *
+ * 使用示例:
  * - 微伏:  ADS1220_ReadVoltage_Int(1, 2048000)  // vref=2.048V, 返回µV
- * - 毫伏: ADS1220_ReadVoltage_Int(1, 2048)     // vref=2.048V, 返回mV  
+ * - 毫伏: ADS1220_ReadVoltage_Int(1, 2048)     // vref=2.048V, 返回mV
  * - 伏特: ADS1220_ReadVoltage_Int(1, 2)        // vref=2.048V, 返回V(整数部分)
  */
 int32_t ADS1220_ReadVoltage_Int(uint8_t gain, int32_t vref_unit)
@@ -711,4 +713,14 @@ int ADS1220_GetLastError(void)
 void ADS1220_ClearError(void)
 {
     g_last_error = ADS1220_ERROR_NONE;
+}
+
+static void ADS1220_Delay_us(uint32_t us)
+{
+    Delay_us(us);
+}
+
+static void ADS1220_Delay_ms(uint32_t ms)
+{
+    Delay_ms(ms);
 }
